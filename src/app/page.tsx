@@ -316,7 +316,7 @@ export default function HomePage() {
   const activeProfile = CHARACTER_PROFILES[avatarIdx];
 
   return (
-    <div className="relative h-dvh max-h-dvh w-full overflow-hidden flex flex-col justify-between casino-hall-bg text-white px-3 sm:px-6 py-3 select-none">
+    <div className="relative h-dvh max-h-dvh w-full overflow-y-auto lg:overflow-hidden flex flex-col justify-between casino-hall-bg text-white px-3 sm:px-6 py-3 select-none">
       {/* Dekorasi Partikel Cahaya Kasino */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[550px] h-48 rounded-full bg-amber-500/15 blur-3xl" />
@@ -332,7 +332,7 @@ export default function HomePage() {
       </div>
 
       {/* ================================================================= */}
-      {/* TOP BAR RINGKAS: LOGO KIRI + TOMBOL AUDIO & ATURAN MAIN KANAN     */}
+      {/* TOP BAR RINGKAS: LOGO KIRI + TOMBOL AUDIO & ATURAN KANAN          */}
       {/* ================================================================= */}
       <header className="relative z-20 max-w-6xl w-full mx-auto shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -341,17 +341,9 @@ export default function HomePage() {
             alt="Poker Barudak"
             className="h-12 sm:h-16 w-auto object-contain drop-shadow-[0_4px_14px_rgba(245,158,11,0.55)]"
           />
-          <div>
-            <h1 className="font-black text-base sm:text-xl tracking-wide text-white leading-none">
-              POKER BARUDAK
-            </h1>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] sm:text-xs text-amber-300 font-bold">
-                3D Interactive Casino Arena
-              </span>
-            </div>
-          </div>
+          <h1 className="font-black text-base sm:text-xl tracking-wide text-white leading-none">
+            POKER BARUDAK
+          </h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -397,7 +389,7 @@ export default function HomePage() {
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-400/50 text-xs font-extrabold text-amber-300 transition shadow-lg"
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Aturan Main</span>
+            <span>Aturan</span>
           </button>
         </div>
       </header>

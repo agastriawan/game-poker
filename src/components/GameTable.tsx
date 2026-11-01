@@ -696,185 +696,201 @@ export default function GameTable({
         </button>
 
         {isSettingsOpen && (
-          <>
-            {/* Backdrop transparan agar klik di luar langsung menutup menu */}
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-2 sm:p-4"
+            onClick={() => setIsSettingsOpen(false)}
+          >
             <div
-              className="fixed inset-0 z-40"
-              onClick={() => setIsSettingsOpen(false)}
-            />
-
-            <div className="relative z-50 mt-2 w-72 sm:w-80 bg-slate-950/95 border-2 border-amber-400/70 rounded-2xl p-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.95)] backdrop-blur-xl space-y-3 animate-taunt-pop">
-              {/* 1. Info Room & Ronde */}
-              <div className="space-y-1.5 pb-2.5 border-b border-slate-800">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-amber-400">
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg max-h-[92%] overflow-y-auto bg-slate-950/95 border-2 border-amber-400/70 rounded-2xl p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.95)] space-y-2.5 animate-taunt-pop"
+            >
+              {/* Header Modal Pengaturan */}
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-400">
                     Pengaturan & Info Meja
                   </span>
                   <span className="text-[10px] font-bold text-slate-400">
                     {supabaseReady ? "🟢 Online" : "🟡 Lokal"}
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-                <div className="flex items-center justify-between bg-slate-900 border border-amber-400/40 px-3 py-1.5 rounded-xl">
-                  <div className="text-xs">
-                    <span className="text-slate-400 mr-1.5">Kode Room:</span>
-                    <span className="font-mono font-black text-amber-300 tracking-wider">
-                      {gameState.roomCode}
-                    </span>
+              {/* Grid 2 Kolom Horizontal Agar Muat Penuh di Layar HP Horizontal */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Kolom Kiri: Info Room & Kontrol Suara/Tema */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between bg-slate-900 border border-amber-400/40 px-2.5 py-1.5 rounded-xl">
+                    <div className="text-xs">
+                      <span className="text-slate-400 mr-1">Kode:</span>
+                      <span className="font-mono font-black text-amber-300 tracking-wider">
+                        {gameState.roomCode}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyRoomCode}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold transition"
+                    >
+                      {copiedCode ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-300">Tersalin</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Salin</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyRoomCode}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-bold transition"
-                  >
-                    {copiedCode ? (
-                      <>
-                        <Check className="w-3 h-3 text-emerald-400" />
-                        <span className="text-emerald-300">Tersalin</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3" />
-                        <span>Salin</span>
-                      </>
-                    )}
-                  </button>
-                </div>
 
-                {gameState.roundNumber > 0 && (
-                  <div className="flex items-center justify-between text-[11px] px-1 text-slate-300">
-                    <span>Ronde #{gameState.roundNumber}</span>
-                    <span className="font-bold text-amber-300">
-                      {gameState.mustCollectThrees
-                        ? "Kumpul 3 (3♠ Awal)"
-                        : "Juara 1 Jalan Awal"}
-                    </span>
-                  </div>
-                )}
-
-                {gameState.shuffleMeta &&
-                  gameState.shuffleMeta.redealHistory.length > 0 && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-[10px] text-amber-200">
-                      <RotateCcw className="w-3 h-3 text-amber-400 shrink-0" />
-                      <span className="truncate">
-                        Redeal Otomatis:{" "}
-                        {gameState.shuffleMeta.redealHistory.length}x
+                  {gameState.roundNumber > 0 && (
+                    <div className="flex items-center justify-between text-[11px] px-1 text-slate-300">
+                      <span>Ronde #{gameState.roundNumber}</span>
+                      <span className="font-bold text-amber-300">
+                        {gameState.mustCollectThrees
+                          ? "Kumpul 3 (3♠ Awal)"
+                          : "Juara 1 Jalan Awal"}
                       </span>
                     </div>
                   )}
-              </div>
 
-              {/* 2. Kontrol Suara & Tema Meja */}
-              <div className="space-y-1.5 pb-2.5 border-b border-slate-800">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Suara & Tampilan Meja
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleToggleBgm}
-                    className={[
-                      "flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl border text-[11px] font-bold transition",
-                      bgmOn
-                        ? "bg-amber-500/20 border-amber-400/60 text-amber-300"
-                        : "bg-slate-900 border-slate-800 text-slate-400",
-                    ].join(" ")}
-                  >
-                    <Music className="w-3.5 h-3.5" />
-                    <span>{bgmOn ? "BGM On" : "BGM Off"}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleToggleSfx}
-                    className={[
-                      "flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl border text-[11px] font-bold transition",
-                      sfxOn
-                        ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
-                        : "bg-slate-900 border-slate-800 text-slate-400",
-                    ].join(" ")}
-                  >
-                    {sfxOn ? (
-                      <Volume2 className="w-3.5 h-3.5" />
-                    ) : (
-                      <VolumeX className="w-3.5 h-3.5" />
-                    )}
-                    <span>{sfxOn ? "SFX On" : "SFX Off"}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleCycleTheme}
-                    className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-200 transition"
-                  >
-                    <Palette className="w-3.5 h-3.5 text-fuchsia-400" />
-                    <span className="capitalize">{feltTheme}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. Klasemen Poin */}
-              <div className="space-y-1.5 pb-2.5 border-b border-slate-800">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                  <Trophy className="w-3 h-3" /> Klasemen Poin
-                </div>
-                <div className="space-y-1">
-                  {[...gameState.players]
-                    .sort((a, b) => b.totalScore - a.totalScore)
-                    .map((p, i) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between text-xs px-2.5 py-1 rounded-lg bg-slate-900"
-                      >
-                        <span className="font-bold truncate">
-                          #{i + 1} {p.name}
-                        </span>
-                        <span
-                          className={[
-                            "font-mono font-extrabold",
-                            p.totalScore > 0
-                              ? "text-emerald-400"
-                              : p.totalScore < 0
-                              ? "text-rose-400"
-                              : "text-slate-300",
-                          ].join(" ")}
-                        >
-                          {p.totalScore > 0 ? `+${p.totalScore}` : p.totalScore}{" "}
-                          pts
+                  {gameState.shuffleMeta &&
+                    gameState.shuffleMeta.redealHistory.length > 0 && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-[10px] text-amber-200">
+                        <RotateCcw className="w-3 h-3 text-amber-400 shrink-0" />
+                        <span className="truncate">
+                          Redeal Otomatis:{" "}
+                          {gameState.shuffleMeta.redealHistory.length}x
                         </span>
                       </div>
-                    ))}
+                    )}
+
+                  <div className="space-y-1 pt-1">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Suara & Tampilan Meja
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                      <button
+                        type="button"
+                        onClick={handleToggleBgm}
+                        className={[
+                          "flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl border text-[10px] font-bold transition",
+                          bgmOn
+                            ? "bg-amber-500/20 border-amber-400/60 text-amber-300"
+                            : "bg-slate-900 border-slate-800 text-slate-400",
+                        ].join(" ")}
+                      >
+                        <Music className="w-3 h-3" />
+                        <span>{bgmOn ? "BGM On" : "BGM Off"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleToggleSfx}
+                        className={[
+                          "flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl border text-[10px] font-bold transition",
+                          sfxOn
+                            ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
+                            : "bg-slate-900 border-slate-800 text-slate-400",
+                        ].join(" ")}
+                      >
+                        {sfxOn ? (
+                          <Volume2 className="w-3 h-3" />
+                        ) : (
+                          <VolumeX className="w-3 h-3" />
+                        )}
+                        <span>{sfxOn ? "SFX On" : "SFX Off"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleCycleTheme}
+                        className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[10px] font-bold text-slate-200 transition"
+                      >
+                        <Palette className="w-3 h-3 text-fuchsia-400" />
+                        <span className="capitalize">{feltTheme}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kolom Kanan: Klasemen Poin & Tombol Aksi */}
+                <div className="flex flex-col justify-between space-y-2">
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                      <Trophy className="w-3 h-3" /> Klasemen Poin
+                    </div>
+                    <div className="space-y-1">
+                      {[...gameState.players]
+                        .sort((a, b) => b.totalScore - a.totalScore)
+                        .map((p, i) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between text-[11px] px-2 py-0.5 rounded-lg bg-slate-900"
+                          >
+                            <span className="font-bold truncate">
+                              #{i + 1} {p.name}
+                            </span>
+                            <span
+                              className={[
+                                "font-mono font-extrabold",
+                                p.totalScore > 0
+                                  ? "text-emerald-400"
+                                  : p.totalScore < 0
+                                  ? "text-rose-400"
+                                  : "text-slate-300",
+                              ].join(" ")}
+                            >
+                              {p.totalScore > 0
+                                ? `+${p.totalScore}`
+                                : p.totalScore}{" "}
+                              pts
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Tombol Panduan Aturan & Keluar Room */}
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSettingsOpen(false);
+                        setIsRulesOpen(true);
+                      }}
+                      className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-[11px] font-bold text-emerald-300 transition"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Aturan</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSettingsOpen(false);
+                        setIsLeaveConfirmOpen(true);
+                      }}
+                      className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-rose-950/90 hover:bg-rose-900 border border-rose-500/50 text-[11px] font-bold text-rose-200 transition"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Keluar Meja</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              {/* 4. Tombol Panduan Aturan & Keluar Room */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSettingsOpen(false);
-                    setIsRulesOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-xs font-bold text-emerald-300 transition"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Aturan & Audit</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSettingsOpen(false);
-                    setIsLeaveConfirmOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-950/90 hover:bg-rose-900 border border-rose-500/50 text-xs font-bold text-rose-200 transition"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Keluar Meja</span>
-                </button>
-              </div>
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -1279,12 +1295,14 @@ export default function GameTable({
                     </button>
 
                     {isTauntMenuOpen && (
-                      <>
+                      <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4"
+                        onClick={() => setIsTauntMenuOpen(false)}
+                      >
                         <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => setIsTauntMenuOpen(false)}
-                        />
-                        <div className="absolute bottom-11 left-0 z-50 w-72 sm:w-80 bg-slate-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-[0_15px_40px_rgba(0,0,0,0.95)] space-y-2.5 animate-taunt-pop">
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full max-w-md max-h-[90%] overflow-y-auto bg-slate-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-[0_15px_40px_rgba(0,0,0,0.95)] space-y-2 animate-taunt-pop"
+                        >
                           <div className="text-[11px] font-black text-amber-300 uppercase tracking-wider flex items-center justify-between border-b border-slate-800 pb-1">
                             <span>😈 Ejek Lawan</span>
                             <button
@@ -1370,7 +1388,7 @@ export default function GameTable({
                             ))}
                           </div>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
