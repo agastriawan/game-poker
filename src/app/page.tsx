@@ -4,16 +4,19 @@ import React, { useEffect, useState } from "react";
 import {
   BookOpen,
   Bot,
-  Crown,
-  Flame,
+  Dices,
   LogIn,
+  Music,
   PlusCircle,
-  ShieldCheck,
-  Sparkles,
   Users,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import GameTable from "@/components/GameTable";
+import PlayingCard from "@/components/PlayingCard";
+import { CHARACTER_PROFILES } from "@/components/PlayerSeat3D";
 import RulesModal from "@/components/RulesModal";
+import { soundEngine } from "@/lib/audio/sound-engine";
 import {
   dispatchGameAction,
   fetchRoomState,
@@ -21,23 +24,53 @@ import {
   subscribeToRoom,
 } from "@/lib/game/room-service";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { GameState } from "@/lib/game/types";
+import { Card, GameState } from "@/lib/game/types";
 
 const SESSION_PLAYER_ID_KEY = "poker_tongkrongan_player_id";
 const SESSION_PLAYER_NAME_KEY = "poker_tongkrongan_player_name";
+const SESSION_AVATAR_IDX_KEY = "poker_tongkrongan_avatar_idx";
+const SESSION_ACTIVE_ROOM_KEY = "poker_tongkrongan_active_room";
+
+const SHOWCASE_CARDS: Card[] = [
+  { id: "3-spades", rank: "3", value: 3, suit: "spades" },
+  { id: "J-diamonds", rank: "J", value: 11, suit: "diamonds" },
+  { id: "Q-clubs", rank: "Q", value: 12, suit: "clubs" },
+  { id: "K-hearts", rank: "K", value: 13, suit: "hearts" },
+  { id: "2-spades", rank: "2", value: 15, suit: "spades" },
+];
+
+const COOL_NICKNAMES = [
+  "Sultan Sekop",
+  "Raja Bom 99",
+  "Dewa Kumpul 3",
+  "Si Tukang Bluff",
+  "Master Poker",
+  "Bos Tongkrongan",
+  "Ratu FullHouse",
+];
 
 export default function HomePage() {
   const [playerId, setPlayerId] = useState<string>("");
   const [playerName, setPlayerName] = useState<string>("Pemain 1");
+  const [avatarIdx, setAvatarIdx] = useState<number>(0);
   const [joinCodeInput, setJoinCodeInput] = useState<string>("");
   const [activeGameState, setActiveGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
+  const [selectedShowcaseIds, setSelectedShowcaseIds] = useState<string[]>([
+    "3-spades",
+    "2-spades",
+  ]);
+  const [charBubbleText, setCharBubbleText] = useState<string>(
+    CHARACTER_PROFILES[0].quote
+  );
+  const [bgmOn, setBgmOn] = useState<boolean>(false);
+  const [sfxOn, setSfxOn] = useState<boolean>(true);
 
   const supabaseReady = isSupabaseConfigured();
 
-  // Inisialisasi identitas pemain unik per tab browser (sessionStorage) agar bisa ngetes multi-tab!
+  // Inisialisasi identitas pemain unik per tab browser
   useEffect(() => {
     if (typeof window === "undefined") return;
     let storedId = sessionStorage.getItem(SESSION_PLAYER_ID_KEY);
@@ -58,7 +91,48 @@ export default function HomePage() {
     } else {
       setPlayerName(`Sobat ${storedId.slice(-3).toUpperCase()}`);
     }
+
+    const savedAvatar = sessionStorage.getItem(SESSION_AVATAR_IDX_KEY);
+    if (savedAvatar !== null) {
+      const idx = Number(savedAvatar) % CHARACTER_PROFILES.length;
+      setAvatarIdx(idx);
+      setCharBubbleText(CHARACTER_PROFILES[idx].quote);
+    }
+
+    // Pulihkan room aktif jika pemain tidak sengaja menekan tombol Refresh
+    const savedActiveRoom =
+      sessionStorage.getItem(SESSION_ACTIVE_ROOM_KEY) ||
+      localStorage.getItem(SESSION_ACTIVE_ROOM_KEY);
+    if (savedActiveRoom) {
+      const localRaw = localStorage.getItem(
+        `poker_tongkrongan_room_${savedActiveRoom.toUpperCase()}`
+      );
+      if (localRaw) {
+        try {
+          const parsed = JSON.parse(localRaw) as GameState;
+          if (parsed.players.some((p) => p.id === storedId)) {
+            setActiveGameState(parsed);
+          }
+        } catch {
+          // ignore
+        }
+      }
+      fetchRoomState(savedActiveRoom).then((remoteState) => {
+        if (remoteState && remoteState.players.some((p) => p.id === storedId)) {
+          setActiveGameState(remoteState);
+        }
+      });
+    }
   }, []);
+
+  // Simpan kode room aktif agar tahan terhadap Refresh sampai pemain benar-benar klik Keluar
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (activeGameState?.roomCode) {
+      sessionStorage.setItem(SESSION_ACTIVE_ROOM_KEY, activeGameState.roomCode);
+      localStorage.setItem(SESSION_ACTIVE_ROOM_KEY, activeGameState.roomCode);
+    }
+  }, [activeGameState?.roomCode]);
 
   // Berlangganan update realtime saat berada di dalam room
   useEffect(() => {
@@ -79,9 +153,53 @@ export default function HomePage() {
     }
   };
 
+  const handleSelectAvatar = (idx: number) => {
+    soundEngine.playCardClick();
+    setAvatarIdx(idx);
+    setCharBubbleText(CHARACTER_PROFILES[idx].quote);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(SESSION_AVATAR_IDX_KEY, String(idx));
+    }
+  };
+
+  const handleRandomNickname = () => {
+    soundEngine.playCardClick();
+    const pick =
+      COOL_NICKNAMES[Math.floor(Math.random() * COOL_NICKNAMES.length)];
+    savePlayerName(pick);
+    setCharBubbleText(`Panggil aku "${pick}"! 🔥`);
+  };
+
+  const handleToggleShowcaseCard = (cardId: string) => {
+    soundEngine.playCardSlam(cardId === "2-spades");
+    setSelectedShowcaseIds((prev) =>
+      prev.includes(cardId)
+        ? prev.filter((id) => id !== cardId)
+        : [...prev, cardId]
+    );
+    if (cardId === "3-spades") {
+      setCharBubbleText("3 Sekop (3♠) berhak jalan paling pertama! ♠️");
+    } else if (cardId === "2-spades") {
+      setCharBubbleText("Ingat! Poker (2) gak boleh ditaruh paling akhir! 💣");
+    } else {
+      setCharBubbleText("Kartu Kerajaan (J, Q, K) wajib ada minimal satu! 👑");
+    }
+  };
+
+  const handleToggleBgm = () => {
+    const active = soundEngine.toggleBgm();
+    setBgmOn(active);
+  };
+
+  const handleToggleSfx = () => {
+    const active = soundEngine.toggleSfx();
+    setSfxOn(active);
+  };
+
   // Buat Room Online Baru
   const handleCreateRoom = async () => {
     const cleanName = playerName.trim() || "Pemain 1";
+    soundEngine.playCardSlam(false);
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -111,6 +229,7 @@ export default function HomePage() {
       return;
     }
 
+    soundEngine.playCardSlam(false);
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -121,7 +240,6 @@ export default function HomePage() {
         );
       }
 
-      // Jika sudah terdaftar di dalam room, langsung masuk kembali (reconnect)
       if (existingState.players.some((p) => p.id === playerId)) {
         setActiveGameState(existingState);
         return;
@@ -145,6 +263,7 @@ export default function HomePage() {
   // Main Cepat vs Bot (2, 3, atau 4 Pemain langsung bagi kartu!)
   const handleQuickPlayWithBots = async (totalPlayers: 2 | 3 | 4) => {
     const cleanName = playerName.trim() || "Pemain 1";
+    soundEngine.playCardSlam(true);
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -155,7 +274,7 @@ export default function HomePage() {
         hostName: cleanName,
       });
 
-      const botNames = ["Bot Eko", "Bot Riko", "Bot Sari"];
+      const botNames = ["Bot Himiya", "Bot Riko", "Bot Sari"];
       for (let i = 0; i < totalPlayers - 1; i++) {
         state = await dispatchGameAction("join_room", state, {
           playerId: `bot-${i + 1}-${Date.now()}`,
@@ -164,7 +283,6 @@ export default function HomePage() {
         });
       }
 
-      // Langsung mulai ronde pertama (Kocok kartu & Fase Kumpul Angka 3)
       state = await dispatchGameAction("start_round", state);
       setActiveGameState(state);
     } catch (err: unknown) {
@@ -176,242 +294,382 @@ export default function HomePage() {
     }
   };
 
+  const handleConfirmLeaveRoom = () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem(SESSION_ACTIVE_ROOM_KEY);
+      localStorage.removeItem(SESSION_ACTIVE_ROOM_KEY);
+    }
+    setActiveGameState(null);
+  };
+
   if (activeGameState) {
     return (
       <GameTable
         gameState={activeGameState}
         myPlayerId={playerId}
         onStateChange={setActiveGameState}
-        onLeaveRoom={() => setActiveGameState(null)}
+        onLeaveRoom={handleConfirmLeaveRoom}
       />
     );
   }
 
+  const activeProfile = CHARACTER_PROFILES[avatarIdx];
+
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-gradient-to-b from-felt-dark via-felt to-felt-dark text-white p-4 sm:p-8">
-      {/* Header Brand */}
-      <div className="max-w-5xl w-full mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg">
-            ♠
-          </div>
+    <div className="relative h-dvh max-h-dvh w-full overflow-hidden flex flex-col justify-between casino-hall-bg text-white px-3 sm:px-6 py-3 select-none">
+      {/* Dekorasi Partikel Cahaya Kasino */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[550px] h-48 rounded-full bg-amber-500/15 blur-3xl" />
+        <div className="absolute top-1/4 left-1/5 w-2 h-2 rounded-full bg-amber-300 animate-ambient-particle" />
+        <div
+          className="absolute top-1/3 right-1/4 w-2.5 h-2.5 rounded-full bg-purple-400 animate-ambient-particle"
+          style={{ animationDelay: "1.2s" }}
+        />
+        <div
+          className="absolute bottom-1/4 left-1/3 w-2 h-2 rounded-full bg-pink-400 animate-ambient-particle"
+          style={{ animationDelay: "2.2s" }}
+        />
+      </div>
+
+      {/* ================================================================= */}
+      {/* TOP BAR RINGKAS: LOGO KIRI + TOMBOL AUDIO & ATURAN MAIN KANAN     */}
+      {/* ================================================================= */}
+      <header className="relative z-20 max-w-6xl w-full mx-auto shrink-0 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img
+            src="/logo.png"
+            alt="Poker Barudak"
+            className="h-12 sm:h-16 w-auto object-contain drop-shadow-[0_4px_14px_rgba(245,158,11,0.55)]"
+          />
           <div>
-            <h1 className="font-extrabold text-lg sm:text-xl tracking-tight text-white">
-              POKER TONGKRONGAN
+            <h1 className="font-black text-base sm:text-xl tracking-wide text-white leading-none">
+              POKER BARUDAK
             </h1>
-            <p className="text-[11px] text-emerald-300 font-medium">
-              Aturan Kumpul Angka 3 • 3♠ Jalan Awal • Bom Poker
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setIsRulesOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-emerald-500/40 text-xs sm:text-sm font-semibold text-amber-300 transition shadow"
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Aturan Main Lengkap</span>
-        </button>
-      </div>
-
-      {/* Konten Lobby Utama */}
-      <div className="max-w-5xl w-full mx-auto my-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-        {/* Kolom Kiri: Highlight Aturan Khas Tongkrongan */}
-        <div className="lg:col-span-6 space-y-5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-bold">
-            <Sparkles className="w-4 h-4" /> 100% Sesuai Aturan Tongkronganmu!
-          </div>
-
-          <h2 className="text-3xl sm:text-4xl font-black leading-tight text-white">
-            Kumpul Angka 3,{" "}
-            <span className="text-amber-400">3 Sekop Jalan Dulu</span>, Awas
-            Kena <span className="text-red-400">BOM Poker!</span>
-          </h2>
-
-          <p className="text-slate-200 text-sm sm:text-base leading-relaxed">
-            Mainkan bersama 2 sampai 4 orang temanmu secara online atau uji strategi melawan Bot AI pintar. Dilengkapi pengocokan kartu kriptografis{" "}
-            <strong className="text-emerald-300">
-              Real-World CSPRNG + Anti-Repeat
-            </strong>{" "}
-            sehingga dijamin adil dan tidak berulang!
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div className="p-3.5 rounded-2xl bg-slate-950/65 border border-emerald-500/25 space-y-1">
-              <div className="font-bold text-amber-400 text-sm flex items-center gap-1.5">
-                <Crown className="w-4 h-4" /> Kumpul 3 & 3♠ Awal
-              </div>
-              <p className="text-xs text-slate-300">
-                Awal game semua kartu 3 dikumpulkan ke meja. Pemilik 3 Sekop (3♠) jalan pertama!
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-950/65 border border-red-500/30 space-y-1">
-              <div className="font-bold text-red-400 text-sm flex items-center gap-1.5">
-                <Flame className="w-4 h-4" /> Bom Lawan 1 Poker (2)
-              </div>
-              <p className="text-xs text-slate-300">
-                1 kartu Poker bisa di-BOM dengan 4 Kartu Kembar atau 5 Seri Sejenis (+10 / -10 poin)!
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-950/65 border border-emerald-500/25 space-y-1">
-              <div className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" /> Kocok Ulang J/Q/K & 4 Poker
-              </div>
-              <p className="text-xs text-slate-300">
-                Otomatis batal & kocok ulang jika ada yang tak dapat J, Q, K atau 1 orang pegang 4 Poker!
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-950/65 border border-emerald-500/25 space-y-1">
-              <div className="font-bold text-sky-400 text-sm flex items-center gap-1.5">
-                <Users className="w-4 h-4" /> 52 Kartu Habis (2-4 Orang)
-              </div>
-              <p className="text-xs text-slate-300">
-                Mendukung Single, Double, Triple, Seri Sejenis (3-4-5♠ dilawan 4-5-6♥), & Full House (3+2).
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Kolom Kanan: Kartu Masuk / Buat Room */}
-        <div className="lg:col-span-6 bg-slate-950/85 border-2 border-emerald-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-6">
-          {/* Input Nama Pemain */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-emerald-300">
-              Nama Panggilan Kamu
-            </label>
-            <input
-              type="text"
-              maxLength={18}
-              value={playerName}
-              onChange={(e) => savePlayerName(e.target.value)}
-              placeholder="Masukkan nama kamu..."
-              className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-white font-bold text-base"
-            />
-          </div>
-
-          {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs font-medium">
-              ⚠️ {errorMsg}
-            </div>
-          )}
-
-          {/* Opsi 1: Buat Room Mabar / Gabung Kode Room */}
-          <div className="space-y-3 pt-1">
-            <div className="text-xs font-bold uppercase tracking-wider text-amber-400">
-              Mabar Online / Multi-Tab Bersama Teman
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCreateRoom}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm sm:text-base shadow-lg shadow-amber-500/20 transition"
-            >
-              <PlusCircle className="w-5 h-5" />
-              Buat Room Baru (Dapatkan Kode Room)
-            </button>
-
-            <form onSubmit={handleJoinRoom} className="flex gap-2">
-              <input
-                type="text"
-                maxLength={8}
-                value={joinCodeInput}
-                onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                placeholder="KODE ROOM (Misal: AB3X9K)"
-                className="flex-1 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 focus:border-emerald-400 focus:outline-none font-mono font-bold uppercase tracking-widest text-sm text-amber-300"
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center gap-1.5 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shrink-0"
-              >
-                <LogIn className="w-4 h-4" />
-                Gabung
-              </button>
-            </form>
-          </div>
-
-          <div className="border-t border-slate-800 pt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                <Bot className="w-4 h-4" /> Langsung Main Lawan Bot Pintar
-              </span>
-              <span className="text-[11px] text-slate-400">
-                Cocok untuk tes aturan & latihan
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] sm:text-xs text-amber-300 font-bold">
+                3D Interactive Casino Arena
               </span>
             </div>
+          </div>
+        </div>
 
-            <div className="grid grid-cols-3 gap-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleToggleBgm}
+            title="Nyalakan / Matikan Backsound"
+            className={[
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition",
+              bgmOn
+                ? "bg-amber-500/25 border-amber-400 text-amber-300"
+                : "bg-slate-900/90 border-slate-700 text-slate-300 hover:text-white",
+            ].join(" ")}
+          >
+            <Music className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {bgmOn ? "BGM On" : "BGM Off"}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleToggleSfx}
+            title="Nyalakan / Matikan Efek Suara"
+            className={[
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition",
+              sfxOn
+                ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
+                : "bg-slate-900/90 border-slate-700 text-slate-400",
+            ].join(" ")}
+          >
+            {sfxOn ? (
+              <Volume2 className="w-3.5 h-3.5" />
+            ) : (
+              <VolumeX className="w-3.5 h-3.5" />
+            )}
+            <span className="hidden sm:inline">SFX</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsRulesOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-400/50 text-xs font-extrabold text-amber-300 transition shadow-lg"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Aturan Main</span>
+          </button>
+        </div>
+      </header>
+
+      {/* ================================================================= */}
+      {/* TENGAH: PANGGUNG KARAKTER 3D INTERAKTIF & PANEL MASUK PERMAINAN   */}
+      {/* ================================================================= */}
+      <main className="relative z-10 max-w-6xl w-full mx-auto flex-1 min-h-0 flex items-center justify-center">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-center">
+          {/* KOLOM KIRI: PANGGUNG INTERAKTIF KARAKTER 3D & KARTU MEJA */}
+          <div className="lg:col-span-6 flex flex-col items-center justify-center space-y-3">
+            {/* Panggung Meja Mini 3D + Karakter yang Bisa Diklik */}
+            <div className="perspective-stage w-full max-w-md">
+              <div className="table-3d-rim rounded-[60px] p-2.5 border-2 border-amber-400/50">
+                <div className="felt-crimson rounded-[50px] border border-amber-300/40 px-4 py-4 flex flex-col items-center justify-center space-y-3 shadow-inner relative">
+                  {/* Balon Dialog Interaktif Karakter */}
+                  <div
+                    key={charBubbleText}
+                    className="px-3.5 py-1 rounded-2xl bg-gradient-to-r from-white via-amber-50 to-amber-100 text-slate-950 border-2 border-amber-400 shadow-lg text-xs font-black text-center animate-taunt-pop"
+                  >
+                    &ldquo;{charBubbleText}&rdquo;
+                  </div>
+
+                  {/* Avatar Karakter Besar Interaktif */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSelectAvatar(
+                        (avatarIdx + 1) % CHARACTER_PROFILES.length
+                      )
+                    }
+                    title="Klik untuk ganti karakter!"
+                    className={[
+                      "relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl overflow-hidden border-2 border-amber-300 shadow-[0_10px_25px_rgba(0,0,0,0.8)] animate-float-char bg-gradient-to-b transition transform hover:scale-105 cursor-pointer",
+                      activeProfile.gradient,
+                    ].join(" ")}
+                  >
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                      <circle
+                        cx="50"
+                        cy="45"
+                        r="38"
+                        fill="rgba(255,255,255,0.12)"
+                      />
+                      <path
+                        d="M22 45 C18 75, 25 92, 50 92 C75 92, 82 75, 78 45 Z"
+                        fill={activeProfile.hairColor}
+                        opacity="0.85"
+                      />
+                      <path
+                        d="M20 98 C22 74, 35 68, 50 68 C65 68, 78 74, 80 98 Z"
+                        fill={activeProfile.outfitColor}
+                      />
+                      <polygon points="42,68 50,82 58,68" fill="#ffffff" />
+                      <polygon points="46,74 54,74 50,85" fill="#f59e0b" />
+                      <ellipse
+                        cx="50"
+                        cy="46"
+                        rx="19"
+                        ry="21"
+                        fill="#fde6d8"
+                      />
+                      <ellipse
+                        cx="42"
+                        cy="47"
+                        rx="3.2"
+                        ry="4.2"
+                        fill="#1e1b4b"
+                      />
+                      <ellipse
+                        cx="58"
+                        cy="47"
+                        rx="3.2"
+                        ry="4.2"
+                        fill="#1e1b4b"
+                      />
+                      <circle cx="41" cy="45.5" r="1.2" fill="#ffffff" />
+                      <circle cx="57" cy="45.5" r="1.2" fill="#ffffff" />
+                      <path
+                        d="M46 56 Q50 60 55 56"
+                        stroke="#be123c"
+                        strokeWidth="2"
+                        fill="none"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M29 42 C30 22, 70 22, 71 42 C65 31, 56 36, 50 29 C44 36, 35 31, 29 42 Z"
+                        fill={activeProfile.hairColor}
+                      />
+                      <polygon
+                        points="38,23 44,14 50,20 56,14 62,23"
+                        fill="#fbbf24"
+                        stroke="#78350f"
+                        strokeWidth="1.2"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* Selector 4 Karakter */}
+                  <div className="flex items-center justify-center gap-1.5">
+                    {CHARACTER_PROFILES.map((prof, idx) => (
+                      <button
+                        key={prof.id}
+                        type="button"
+                        onClick={() => handleSelectAvatar(idx)}
+                        className={[
+                          "px-2.5 py-1 rounded-full text-[10px] font-black transition border",
+                          avatarIdx === idx
+                            ? "bg-amber-400 text-slate-950 border-white shadow scale-105"
+                            : "bg-slate-950/80 text-slate-300 border-slate-700 hover:border-amber-400/50",
+                        ].join(" ")}
+                      >
+                        {prof.title}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Barisan Kartu Interaktif */}
+                  <div className="pt-2 flex items-center justify-center gap-1.5 sm:gap-2">
+                    {SHOWCASE_CARDS.map((card) => (
+                      <PlayingCard
+                        key={card.id}
+                        card={card}
+                        size="md"
+                        selected={selectedShowcaseIds.includes(card.id)}
+                        onClick={() => handleToggleShowcaseCard(card.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* KOLOM KANAN: KONTROL MASUK PERMAINAN (MABAR & VS BOT) */}
+          <div className="lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-3xl p-4 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl space-y-4">
+            {/* Input Nama Panggilan + Tombol Acak Nama */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-amber-300">
+                Nama Panggilan di Meja
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  maxLength={18}
+                  value={playerName}
+                  onChange={(e) => savePlayerName(e.target.value)}
+                  placeholder="Masukkan nama kamu..."
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-white font-black text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleRandomNickname}
+                  title="Acak Nama Keren"
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/40 text-amber-300 transition flex items-center gap-1 text-xs font-bold shrink-0"
+                >
+                  <Dices className="w-4 h-4" />
+                  <span className="hidden sm:inline">Acak</span>
+                </button>
+              </div>
+            </div>
+
+            {errorMsg && (
+              <div className="p-2.5 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs font-bold">
+                ⚠️ {errorMsg}
+              </div>
+            )}
+
+            {/* Opsi 1: Mabar Online Bersama Teman */}
+            <div className="space-y-2.5 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                  <Users className="w-4 h-4" /> Mabar Online Bersama Teman
+                </span>
+                <span className="text-[10px] font-bold text-slate-400">
+                  {supabaseReady ? "🟢 Realtime Online" : "🟡 Multi-Tab"}
+                </span>
+              </div>
+
               <button
                 type="button"
-                onClick={() => handleQuickPlayWithBots(4)}
+                onClick={handleCreateRoom}
                 disabled={loading}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/60 transition"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-[0_6px_20px_rgba(245,158,11,0.3)] transition transform active:scale-95"
               >
-                <span className="font-extrabold text-sm text-amber-300">
-                  4 Pemain
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  Kamu + 3 Bot (13 kartu)
-                </span>
+                <PlusCircle className="w-4 h-4" />
+                Buat Room Mabar Baru (Dapatkan Kode)
               </button>
 
-              <button
-                type="button"
-                onClick={() => handleQuickPlayWithBots(3)}
-                disabled={loading}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/60 transition"
-              >
-                <span className="font-extrabold text-sm text-emerald-300">
-                  3 Pemain
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  Kamu + 2 Bot (17/18 kartu)
-                </span>
-              </button>
+              <form onSubmit={handleJoinRoom} className="flex gap-2">
+                <input
+                  type="text"
+                  maxLength={8}
+                  value={joinCodeInput}
+                  onChange={(e) =>
+                    setJoinCodeInput(e.target.value.toUpperCase())
+                  }
+                  placeholder="KODE ROOM (Contoh: AB3X9K)"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-emerald-400 focus:outline-none font-mono font-black uppercase tracking-widest text-xs sm:text-sm text-amber-300"
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm transition shrink-0 shadow-lg"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Gabung
+                </button>
+              </form>
+            </div>
 
-              <button
-                type="button"
-                onClick={() => handleQuickPlayWithBots(2)}
-                disabled={loading}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/60 transition"
-              >
-                <span className="font-extrabold text-sm text-sky-300">
-                  2 Pemain
+            {/* Opsi 2: Langsung Main vs Bot 3D */}
+            <div className="border-t border-slate-800 pt-3.5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                  <Bot className="w-4 h-4" /> Langsung Main vs Bot 3D
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  Duel 1v1 (26 kartu)
+                <span className="text-[10px] font-bold text-slate-400">
+                  1-Klik Langsung Bagi Kartu
                 </span>
-              </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleQuickPlayWithBots(4)}
+                  disabled={loading}
+                  className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-amber-500/15 border border-slate-700 hover:border-amber-400 transition transform hover:-translate-y-0.5"
+                >
+                  <span className="font-black text-xs sm:text-sm text-amber-300 group-hover:scale-105 transition">
+                    🔥 4 Pemain
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    13 Kartu / Org
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleQuickPlayWithBots(3)}
+                  disabled={loading}
+                  className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-emerald-500/15 border border-slate-700 hover:border-emerald-400 transition transform hover:-translate-y-0.5"
+                >
+                  <span className="font-black text-xs sm:text-sm text-emerald-300 group-hover:scale-105 transition">
+                    ⚡ 3 Pemain
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    17–18 Kartu
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleQuickPlayWithBots(2)}
+                  disabled={loading}
+                  className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-sky-500/15 border border-slate-700 hover:border-sky-400 transition transform hover:-translate-y-0.5"
+                >
+                  <span className="font-black text-xs sm:text-sm text-sky-300 group-hover:scale-105 transition">
+                    ⚔️ Duel 1v1
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    26 Kartu / Org
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* Footer Info */}
-      <footer className="max-w-5xl w-full mx-auto text-center text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2 border-t border-emerald-500/20 pt-4">
-        <div>
-          Engine Pengocokan:{" "}
-          <span className="text-emerald-300 font-semibold">
-            Server CSPRNG + Riffle/Cut + Anti-Similarity Guard
-          </span>
-        </div>
-        <div>
-          Mode Sinkronisasi:{" "}
-          {supabaseReady ? (
-            <span className="text-emerald-400 font-semibold">
-              Supabase Realtime Aktif (Siap Vercel)
-            </span>
-          ) : (
-            <span className="text-amber-300 font-semibold">
-              Multi-Tab Broadcast & Bot AI Aktif (Tambahkan .env.local untuk Supabase Online)
-            </span>
-          )}
-        </div>
-      </footer>
+      {/* Spacer Bawah Ringkas Tanpa Teks Panjang */}
+      <div className="h-1 shrink-0" />
 
       <RulesModal
         isOpen={isRulesOpen}
@@ -422,4 +680,3 @@ export default function HomePage() {
     </div>
   );
 }
-

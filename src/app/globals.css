@@ -6,11 +6,167 @@
   color-scheme: dark;
 }
 
+html,
 body {
-  background-color: #062315;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  background-color: #090612;
   color: #f8fafc;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Oxygen, Ubuntu, Cantarell, sans-serif;
-  overflow-x: hidden;
+}
+
+/* Perspektif Meja Kasino 3D ala Poker Fate */
+.casino-hall-bg {
+  background:
+    radial-gradient(circle at 50% 15%, rgba(245, 158, 11, 0.16) 0%, transparent 45%),
+    radial-gradient(circle at 18% 25%, rgba(168, 85, 247, 0.14) 0%, transparent 40%),
+    radial-gradient(circle at 82% 25%, rgba(236, 72, 153, 0.12) 0%, transparent 40%),
+    linear-gradient(180deg, #160f29 0%, #0d1b24 48%, #050b11 100%);
+}
+
+.perspective-stage {
+  perspective: 1100px;
+}
+
+.table-3d-surface {
+  transform: rotateX(18deg);
+  transform-style: preserve-3d;
+  box-shadow:
+    0 14px 0 #2b1508,
+    0 18px 0 #1a0c04,
+    0 28px 45px rgba(0, 0, 0, 0.85),
+    inset 0 0 50px rgba(0, 0, 0, 0.75);
+}
+
+.table-3d-rim {
+  background: linear-gradient(145deg, #6b3410 0%, #3d1c05 45%, #230f02 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(251, 191, 36, 0.45),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.85),
+    0 12px 0 #1f0d02,
+    0 20px 38px rgba(0, 0, 0, 0.9);
+}
+
+.felt-crimson {
+  background: radial-gradient(ellipse at center, #7f1d1d 0%, #450a0a 68%, #280505 100%);
+}
+
+.felt-emerald {
+  background: radial-gradient(ellipse at center, #14532d 0%, #06371e 68%, #031d10 100%);
+}
+
+.felt-royal {
+  background: radial-gradient(ellipse at center, #312e81 0%, #1e1b4b 68%, #0f0d29 100%);
+}
+
+/* Animasi Karakter Bernapas / Mengambang Halus */
+@keyframes floatCharacter {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.015);
+  }
+}
+
+.animate-float-char {
+  animation: floatCharacter 3.4s ease-in-out infinite;
+}
+
+/* Animasi Kartu Meluncur Halus ke Tengah Meja (Tegak & Smooth) */
+@keyframes cardFlyToTable {
+  0% {
+    opacity: 0;
+    transform: translateY(36px) scale(0.88);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
+  }
+}
+
+.animate-card-throw {
+  animation: cardFlyToTable 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Animasi Balon Emot / Ejekan Pop-Up (Lurus & Smooth) */
+@keyframes tauntPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.75) translateY(12px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.04) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0px);
+  }
+}
+
+.animate-taunt-pop {
+  animation: tauntPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Animasi Partikel Cahaya Kasino Berjalan */
+@keyframes ambientFloat {
+  0% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(-22px) translateX(10px);
+    opacity: 0.65;
+  }
+  100% {
+    transform: translateY(-44px) translateX(-6px);
+    opacity: 0.1;
+  }
+}
+
+.animate-ambient-particle {
+  animation: ambientFloat 4.5s ease-in-out infinite;
+}
+
+/* Animasi Getar Layar saat BOM Meledak */
+@keyframes screenBombShake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  15% { transform: translate(-12px, -8px) rotate(-1.5deg); }
+  30% { transform: translate(12px, 6px) rotate(1.5deg); }
+  45% { transform: translate(-10px, 8px) rotate(-1deg); }
+  60% { transform: translate(10px, -6px) rotate(1deg); }
+  75% { transform: translate(-6px, 4px) rotate(-0.5deg); }
+}
+
+.animate-screen-bomb {
+  animation: screenBombShake 0.65s ease-in-out;
+}
+
+/* Paksa Mode Horizontal (Landscape) Otomatis saat In-Game di Handphone (Portrait) */
+.ingame-landscape-stage {
+  width: 100dvw;
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+@media screen and (max-width: 767px) and (orientation: portrait) {
+  .ingame-landscape-stage {
+    position: fixed !important;
+    top: 0;
+    left: 100dvw;
+    width: 100dvh !important;
+    height: 100dvw !important;
+    max-height: 100dvw !important;
+    transform-origin: top left;
+    transform: rotate(90deg);
+    z-index: 50;
+  }
 }
 

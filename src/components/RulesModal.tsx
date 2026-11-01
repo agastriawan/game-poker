@@ -81,6 +81,9 @@ export default function RulesModal({
               <li>
                 <strong>Full House (5 Kartu: 3 Kembar + 2 Buntut):</strong> Contoh <code className="text-amber-300">4-4-4 + 3-3</code>. Dilawan dengan Full House yang nilai 3 kartu kembarnya lebih tinggi.
               </li>
+              <li>
+                <strong className="text-amber-300">Larangan Poker di Paling Akhir:</strong> Kartu <strong>Poker (angka 2)</strong> <u>TIDAK BOLEH</u> ditaruh atau disisakan di paling akhir sebagai kartu penutup! Kamu wajib mengeluarkan kartu Poker terlebih dahulu sebelum menghabiskan kartu terakhir.
+              </li>
             </ul>
           </section>
 

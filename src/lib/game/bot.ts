@@ -109,6 +109,15 @@ function chooseBestBotPlay(
   const instantWin = validPlays.find((p) => p.length === handSize);
   if (instantWin) return instantWin;
 
+  // Karena Poker (2) tidak boleh ditaruh di paling akhir, jika sisa kartu tinggal sedikit (<= 4),
+  // prioritaskan membuang kartu Poker (2) terlebih dahulu agar tidak nyangkut di akhir!
+  if (handSize <= 4) {
+    const pokerPlay = validPlays.find((p) =>
+      p.cards.some((c) => c.value === 15)
+    );
+    if (pokerPlay) return pokerPlay;
+  }
+
   if (isFreeLead) {
     // Urutkan prioritas saat jalan bebas: kombinasi kartu lebih banyak & nilai rendah didahulukan
     // tetapi jangan pecahkan 5-card straight flush jika masih banyak kartu (simpan buat Bom!)

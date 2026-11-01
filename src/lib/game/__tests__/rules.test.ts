@@ -7,7 +7,12 @@ import {
   startNewRound,
   submitPlayerThrees,
 } from "../engine";
-import { canBeatPlay, evaluateCombo } from "../rules";
+import {
+  canBeatPlay,
+  checkPokerLastCardViolation,
+  evaluateCombo,
+  findAllValidPlays,
+} from "../rules";
 import { checkRedealCondition, dealFairHandsWithRedealCheck } from "../shuffle";
 import { Card } from "../types";
 
@@ -260,6 +265,56 @@ console.log("=== Menjalankan Unit Test Aturan Game Poker Online ===");
   assert.equal(updatedVictim.totalScore, -10, "Korban Bom harus terkena -10 poin");
 
   console.log("✅ [PASS] Alur Kumpul 3, Pemilik 3♠ Jalan Pertama, Eksekusi BOM (+10/-10), & Reset Kumpul 3");
+}
+
+// 7. Uji Aturan Baru: Kartu Poker (2) TIDAK BOLEH ditaruh / disisakan di paling akhir
+{
+  const handWithPokerAndNormal = [
+    makeCard("8", 8, "hearts"),
+    makeCard("2", 15, "spades"),
+  ];
+
+  // Membuang 8♥ dulu menyisakan hanya 2♠ di paling akhir -> harus melanggar!
+  const v1 = checkPokerLastCardViolation(handWithPokerAndNormal, [
+    makeCard("8", 8, "hearts"),
+  ]);
+  assert.equal(
+    v1.violates,
+    true,
+    "Membuang kartu biasa yang menyisakan hanya Poker (2) di akhir harus dilarang"
+  );
+
+  // Membuang 2♠ dulu menyisakan 8♥ di akhir -> harus sah!
+  const v2 = checkPokerLastCardViolation(handWithPokerAndNormal, [
+    makeCard("2", 15, "spades"),
+  ]);
+  assert.equal(
+    v2.violates,
+    false,
+    "Membuang Poker (2) terlebih dahulu dan menyisakan 8♥ harus diizinkan"
+  );
+
+  // Membuang 2♠ sebagai kartu terakhir (sisa 0) -> harus melanggar!
+  const v3 = checkPokerLastCardViolation(
+    [makeCard("2", 15, "spades")],
+    [makeCard("2", 15, "spades")]
+  );
+  assert.equal(
+    v3.violates,
+    true,
+    "Menutup permainan dengan kartu Poker (2) di paling akhir harus dilarang"
+  );
+
+  // Pastikan findAllValidPlays hanya menyarankan buang 2♠ dulu saat memegang [8♥, 2♠]
+  const validMoves = findAllValidPlays(handWithPokerAndNormal, null);
+  assert.equal(validMoves.length, 1);
+  assert.equal(
+    validMoves[0].cards[0].id,
+    "2-spades",
+    "Saran langkah valid wajib memilih 2♠ terlebih dahulu agar Poker tidak di paling akhir"
+  );
+
+  console.log("✅ [PASS] Aturan Baru: Kartu Poker (2) Tidak Boleh Ditaruh di Paling Akhir");
 }
 
 console.log("\n🎉 SEMUA UNIT TEST BERHASIL 100% TANPA ERROR!");

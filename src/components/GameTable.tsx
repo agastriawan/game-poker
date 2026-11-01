@@ -1,38 +1,107 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import {
-  BookOpen,
-  Bot,
   Check,
   Copy,
   Crown,
   Flame,
-  Lightbulb,
   LogOut,
+  MessageSquareMore,
+  Music,
+  Palette,
   Play,
   RotateCcw,
+  Settings,
   ShieldCheck,
   SkipForward,
   Sparkles,
   Trophy,
+  Trash2,
   UserPlus,
   Users,
-  Trash2,
+  Volume2,
+  VolumeX,
+  X,
 } from "lucide-react";
 import PlayingCard from "./PlayingCard";
+import PlayerSeat3D from "./PlayerSeat3D";
 import RulesModal from "./RulesModal";
+import { soundEngine } from "@/lib/audio/sound-engine";
 import { getNextBotAction } from "@/lib/game/bot";
+import { TAUNT_PRESETS } from "@/lib/game/engine";
 import {
   canBeatPlay,
+  checkPokerLastCardViolation,
   evaluateCombo,
   findAllBombsInHand,
-  findAllValidPlays,
 } from "@/lib/game/rules";
 import { dispatchGameAction } from "@/lib/game/room-service";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { GameState } from "@/lib/game/types";
+import { GameState, PlayerState, TauntEvent } from "@/lib/game/types";
+
+function PlayerTableSlot({
+  player,
+  gameState,
+}: {
+  player: PlayerState;
+  gameState: GameState;
+  isMe?: boolean;
+}) {
+  // Hanya ambil kartu yang dikeluarkan pemain ini pada 1 putaran (trick) yang sedang berjalan
+  const trickPlays = useMemo(
+    () => gameState.trickPile.filter((tp) => tp.playerId === player.id),
+    [gameState.trickPile, player.id]
+  );
+
+  const latestPlay =
+    trickPlays.length > 0 ? trickPlays[trickPlays.length - 1] : null;
+
+  const isHighestActive =
+    !!latestPlay &&
+    gameState.currentTablePlay?.playerId === player.id &&
+    gameState.currentTablePlay?.timestamp === latestPlay.timestamp;
+
+  if (!latestPlay) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0">
+        {player.hasPassedThisTrick ? (
+          <div className="px-2.5 py-0.5 rounded-full bg-slate-950/85 border border-rose-500/50 text-[9px] sm:text-[10px] font-black text-rose-300">
+            PASS
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      key={latestPlay.timestamp}
+      className="relative flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0 animate-card-throw"
+    >
+      {/* Deretan Kartu yang Dibuang pada Putaran Ini di Depan Meja Masing-Masing */}
+      <div
+        className={[
+          "relative flex items-center justify-center -space-x-1.5 sm:-space-x-1 py-0.5 px-1.5 rounded-lg transition-all",
+          isHighestActive
+            ? "ring-2 ring-amber-400 bg-amber-500/20 shadow-[0_0_16px_rgba(245,158,11,0.5)] scale-100"
+            : "opacity-80 scale-95",
+        ].join(" ")}
+      >
+        {latestPlay.combo.cards.map((card) => (
+          <PlayingCard key={card.id} card={card} size="xs" disabled />
+        ))}
+
+        {player.hasPassedThisTrick && !isHighestActive && (
+          <span className="absolute -top-2 -right-2 px-1.5 py-0.2 rounded-full bg-slate-950 border border-rose-500/60 text-rose-300 font-black text-[8px]">
+            PASS
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface GameTableProps {
   gameState: GameState;
@@ -41,7 +110,9 @@ interface GameTableProps {
   onLeaveRoom: () => void;
 }
 
-const BOT_NAMES = ["Bot Eko", "Bot Riko", "Bot Sari", "Bot Dodi"];
+const BOT_NAMES = ["Bot Himiya", "Bot Riko", "Bot Sari", "Bot Dodi"];
+
+type FeltTheme = "crimson" | "emerald" | "royal";
 
 export default function GameTable({
   gameState,
@@ -50,16 +121,35 @@ export default function GameTable({
   onLeaveRoom,
 }: GameTableProps) {
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
-  const [hintIndex, setHintIndex] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [isRulesOpen, setIsRulesOpen] = useState(false);
+  const [isTauntMenuOpen, setIsTauntMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+  const [feltTheme, setFeltTheme] = useState<FeltTheme>("crimson");
+  const [bgmOn, setBgmOn] = useState<boolean>(true);
+  const [sfxOn, setSfxOn] = useState<boolean>(true);
+  const [visibleTaunts, setVisibleTaunts] = useState<Record<string, TauntEvent>>(
+    {}
+  );
+  const [customTauntText, setCustomTauntText] = useState<string>("");
+  const [customTauntEmoji, setCustomTauntEmoji] = useState<string>("😈");
+  const [isBombShaking, setIsBombShaking] = useState<boolean>(false);
+
+  const lastPlayedTimestampRef = useRef<number>(0);
+  const lastTauntIdRef = useRef<string>("");
+  const tauntTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>(
+    {}
+  );
 
   const supabaseReady = isSupabaseConfigured();
 
   const myPlayer = useMemo(
-    () => gameState.players.find((p) => p.id === myPlayerId) || gameState.players[0],
+    () =>
+      gameState.players.find((p) => p.id === myPlayerId) ||
+      gameState.players[0],
     [gameState.players, myPlayerId]
   );
 
@@ -68,25 +158,133 @@ export default function GameTable({
     gameState.phase === "playing" &&
     gameState.currentTurnPlayerId === myPlayer?.id;
 
+  // Nyalakan BGM otomatis pada interaksi pertama di meja
+  useEffect(() => {
+    soundEngine.startBgm();
+    return () => {
+      soundEngine.stopBgm();
+    };
+  }, []);
+
+  // Cegah keluar tidak sengaja saat tombol Refresh atau Back ditekan & paksa orientasi landscape di HP
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Coba kunci orientasi layar ke landscape jika didukung browser HP
+    const orientationApi = window.screen?.orientation as
+      | (ScreenOrientation & { lock?: (mode: string) => Promise<void> })
+      | undefined;
+    if (orientationApi?.lock) {
+      orientationApi.lock("landscape").catch(() => {
+        // Fallback otomatis ditangani oleh CSS .ingame-landscape-stage
+      });
+    }
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    window.history.pushState({ pokerInGame: true }, "", window.location.href);
+    const handlePopState = () => {
+      window.history.pushState({ pokerInGame: true }, "", window.location.href);
+      setIsLeaveConfirmOpen(true);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
   // Bersihkan pilihan kartu saat ronde atau giliran berubah
   useEffect(() => {
     setSelectedCardIds([]);
-    setHintIndex(0);
     setErrorMsg(null);
   }, [gameState.roundNumber, gameState.phase, gameState.currentTurnPlayerId]);
 
-  // Efek Confetti saat Juara 1 atau berhasil mengebom
+  // Deteksi kartu baru dibanting ke meja -> bunyikan SFX banting kartu
+  useEffect(() => {
+    if (
+      gameState.currentTablePlay &&
+      gameState.currentTablePlay.timestamp !== lastPlayedTimestampRef.current
+    ) {
+      lastPlayedTimestampRef.current = gameState.currentTablePlay.timestamp;
+      const isBig =
+        gameState.currentTablePlay.combo.length >= 5 ||
+        gameState.currentTablePlay.combo.primaryValue === 15;
+      soundEngine.playCardSlam(isBig);
+    }
+  }, [gameState.currentTablePlay]);
+
+  // Deteksi Emot / Taunt baru -> tampilkan balon selama 10 detik per pemain & bunyikan SFX
+  useEffect(() => {
+    const taunt = gameState.latestTaunt;
+    if (taunt && taunt.id !== lastTauntIdRef.current) {
+      lastTauntIdRef.current = taunt.id;
+      soundEngine.playTauntSound(taunt.tauntId);
+
+      setVisibleTaunts((prev) => ({
+        ...prev,
+        [taunt.senderId]: taunt,
+      }));
+
+      if (tauntTimersRef.current[taunt.senderId]) {
+        clearTimeout(tauntTimersRef.current[taunt.senderId]);
+      }
+
+      tauntTimersRef.current[taunt.senderId] = setTimeout(() => {
+        setVisibleTaunts((prev) => {
+          if (prev[taunt.senderId]?.id !== taunt.id) return prev;
+          const copy = { ...prev };
+          delete copy[taunt.senderId];
+          return copy;
+        });
+      }, 10000);
+    }
+  }, [gameState.latestTaunt]);
+
+  useEffect(() => {
+    const timers = tauntTimersRef.current;
+    return () => {
+      Object.values(timers).forEach((t) => clearTimeout(t));
+    };
+  }, []);
+
+  const handleDismissMyTaunt = () => {
+    if (!myPlayer) return;
+    if (tauntTimersRef.current[myPlayer.id]) {
+      clearTimeout(tauntTimersRef.current[myPlayer.id]);
+    }
+    setVisibleTaunts((prev) => {
+      const copy = { ...prev };
+      delete copy[myPlayer.id];
+      return copy;
+    });
+  };
+
+  // Efek Suara & Confetti saat ronde selesai atau terjadi BOM
   useEffect(() => {
     if (gameState.phase === "round_end" && gameState.roundSummary) {
+      if (gameState.roundSummary.endReason === "bomb") {
+        soundEngine.playBombExplosion();
+        setIsBombShaking(true);
+        setTimeout(() => setIsBombShaking(false), 800);
+      } else {
+        soundEngine.playWinFanfare();
+      }
+
       const myResult = gameState.roundSummary.rankings.find(
         (r) => r.playerId === myPlayer?.id
       );
       if (myResult && myResult.scoreDelta > 0) {
         try {
           confetti({
-            particleCount: 80,
-            spread: 70,
-            origin: { y: 0.6 },
+            particleCount: 85,
+            spread: 75,
+            origin: { y: 0.55 },
           });
         } catch {
           // ignore
@@ -95,7 +293,7 @@ export default function GameTable({
     }
   }, [gameState.phase, gameState.roundSummary, myPlayer?.id]);
 
-  // Otomasi langkah Bot (dijalankan oleh Host atau pemain aktif agar terkoordinasi)
+  // Otomasi langkah Bot
   useEffect(() => {
     const botAction = getNextBotAction(gameState);
     if (!botAction) return;
@@ -118,6 +316,7 @@ export default function GameTable({
           });
           onStateChange(next);
         } else if (botAction.actionType === "pass") {
+          soundEngine.playPassSound();
           const next = await dispatchGameAction("pass_turn", gameState, {
             playerId: botAction.botId,
           });
@@ -126,7 +325,7 @@ export default function GameTable({
       } catch (err) {
         console.error("Bot step error:", err);
       }
-    }, 850);
+    }, 900);
 
     return () => clearTimeout(timer);
   }, [gameState, onStateChange]);
@@ -148,22 +347,33 @@ export default function GameTable({
     : null;
 
   const beatValidation = useMemo(() => {
-    if (!evaluatedSelectedCombo) return null;
-    return canBeatPlay(evaluatedSelectedCombo, currentTableCombo);
-  }, [evaluatedSelectedCombo, currentTableCombo]);
+    if (!evaluatedSelectedCombo || !myPlayer) return null;
+    const baseCheck = canBeatPlay(evaluatedSelectedCombo, currentTableCombo);
+    if (!baseCheck.valid) return baseCheck;
 
-  // Cek semua langkah valid & Bom yang dimiliki pemain saat ini
-  const myValidPlays = useMemo(() => {
-    if (!myPlayer || gameState.phase !== "playing") return [];
-    return findAllValidPlays(myPlayer.hand, currentTableCombo);
-  }, [myPlayer, gameState.phase, currentTableCombo]);
+    // Jika bukan BOM, pastikan tidak menaruh atau menyisakan Poker (2) di paling akhir
+    if (!baseCheck.isBomb) {
+      const lastCardCheck = checkPokerLastCardViolation(
+        myPlayer.hand,
+        selectedCardsObj
+      );
+      if (lastCardCheck.violates) {
+        return {
+          valid: false,
+          isBomb: false,
+          reason: lastCardCheck.reason,
+        };
+      }
+    }
+
+    return baseCheck;
+  }, [evaluatedSelectedCombo, currentTableCombo, myPlayer, selectedCardsObj]);
 
   const myBombs = useMemo(() => {
     if (!myPlayer || gameState.phase !== "playing") return [];
     return findAllBombsInHand(myPlayer.hand);
   }, [myPlayer, gameState.phase]);
 
-  // Apakah saat ini lawan baru saja mengeluarkan Single Poker (2) dan kita punya senjata Bom?
   const canDetonateBombNow = useMemo(() => {
     if (
       gameState.phase !== "playing" ||
@@ -182,7 +392,6 @@ export default function GameTable({
     return isSinglePokerOnTable && isOpponentPoker && myBombs.length > 0;
   }, [gameState.phase, gameState.currentTablePlay, myPlayer, myBombs]);
 
-  // Kumpulan ID kartu di tangan yang termasuk bagian dari Bom (untuk highlight visual)
   const bombCardIdsSet = useMemo(() => {
     const set = new Set<string>();
     if (canDetonateBombNow) {
@@ -194,6 +403,7 @@ export default function GameTable({
   }, [canDetonateBombNow, myBombs]);
 
   const toggleCardSelection = (cardId: string) => {
+    soundEngine.playCardClick();
     setErrorMsg(null);
     setSelectedCardIds((prev) =>
       prev.includes(cardId)
@@ -202,10 +412,54 @@ export default function GameTable({
     );
   };
 
+  const handleToggleBgm = () => {
+    const active = soundEngine.toggleBgm();
+    setBgmOn(active);
+  };
+
+  const handleToggleSfx = () => {
+    const active = soundEngine.toggleSfx();
+    setSfxOn(active);
+  };
+
+  const handleCycleTheme = () => {
+    setFeltTheme((prev) =>
+      prev === "crimson" ? "emerald" : prev === "emerald" ? "royal" : "crimson"
+    );
+  };
+
   const handleCopyRoomCode = () => {
     navigator.clipboard.writeText(gameState.roomCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleSendTaunt = async (
+    tauntId: string,
+    customText?: string,
+    customEmoji?: string
+  ) => {
+    if (!myPlayer) return;
+    setIsTauntMenuOpen(false);
+    setCustomTauntText("");
+    try {
+      const next = await dispatchGameAction("send_taunt", gameState, {
+        playerId: myPlayer.id,
+        tauntId,
+        customText,
+        customEmoji,
+      });
+      onStateChange(next);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCustomTauntSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = customTauntText.trim();
+    if (!clean) return;
+    handleSendTaunt("custom", clean, customTauntEmoji);
   };
 
   const handleAddBot = async () => {
@@ -240,7 +494,9 @@ export default function GameTable({
       });
       onStateChange(next);
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Gagal menghapus pemain.");
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal menghapus pemain."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -248,6 +504,7 @@ export default function GameTable({
 
   const handleStartRound = async () => {
     if (gameState.players.length < 2 || isSubmitting) return;
+    soundEngine.startBgm();
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
@@ -262,6 +519,7 @@ export default function GameTable({
 
   const handleSubmitThrees = async () => {
     if (!myPlayer || isSubmitting) return;
+    soundEngine.playCardSlam(false);
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
@@ -316,6 +574,7 @@ export default function GameTable({
 
   const handlePassTurn = async () => {
     if (!myPlayer || isSubmitting) return;
+    soundEngine.playPassSound();
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
@@ -331,20 +590,29 @@ export default function GameTable({
     }
   };
 
-  const handleCycleHint = () => {
-    if (myValidPlays.length === 0) {
-      setErrorMsg(
-        "Tidak ada kombinasi kartu di tangan yang bisa mengalahkan kartu di meja. Silakan klik Lewat (Pass)."
-      );
-      return;
+  const handleConfirmForfeitAndLeave = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      if (
+        myPlayer &&
+        (gameState.phase === "collecting_threes" ||
+          gameState.phase === "playing")
+      ) {
+        await dispatchGameAction("forfeit_game", gameState, {
+          playerId: myPlayer.id,
+        });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsSubmitting(false);
+      setIsLeaveConfirmOpen(false);
+      onLeaveRoom();
     }
-    const targetPlay = myValidPlays[hintIndex % myValidPlays.length];
-    setSelectedCardIds(targetPlay.cards.map((c) => c.id));
-    setHintIndex((prev) => prev + 1);
-    setErrorMsg(null);
   };
 
-  // Urutkan lawan relatif terhadap kursi pemain kita
+  // Urutkan lawan relatif terhadap kursi kita (searah jarum jam: Kiri -> Atas -> Kanan)
   const opponents = useMemo(() => {
     if (!myPlayer) return [];
     const myIdx = gameState.players.findIndex((p) => p.id === myPlayer.id);
@@ -355,792 +623,839 @@ export default function GameTable({
     return list;
   }, [gameState.players, myPlayer]);
 
+  // Penempatan kursi lawan di sekeliling meja 3D
+  const seatAssignments = useMemo(() => {
+    if (opponents.length === 1) {
+      return { left: null, top: opponents[0], right: null };
+    }
+    if (opponents.length === 2) {
+      return { left: opponents[0], top: null, right: opponents[1] };
+    }
+    if (opponents.length >= 3) {
+      return {
+        left: opponents[0],
+        top: opponents[1],
+        right: opponents[2],
+      };
+    }
+    return { left: null, top: null, right: null };
+  }, [opponents]);
+
   const myThreesCount = useMemo(() => {
     if (!myPlayer) return 0;
     return myPlayer.hand.filter((c) => c.value === 3).length;
   }, [myPlayer]);
 
+  const feltClass =
+    feltTheme === "crimson"
+      ? "felt-crimson"
+      : feltTheme === "emerald"
+      ? "felt-emerald"
+      : "felt-royal";
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-felt-dark via-felt to-felt-dark text-white">
-      {/* HEADER BAR */}
-      <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-slate-950/80 border-b border-emerald-500/20 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-emerald-950/90 border border-emerald-500/40 px-3 py-1.5 rounded-xl">
-            <span className="text-xs text-emerald-300 font-medium">ROOM:</span>
-            <span className="font-mono font-extrabold text-amber-400 tracking-wider">
-              {gameState.roomCode}
-            </span>
-            <button
-              onClick={handleCopyRoomCode}
-              title="Salin Kode Room"
-              className="text-slate-300 hover:text-white transition"
-            >
-              {copiedCode ? (
-                <Check className="w-4 h-4 text-emerald-400" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+    <div
+      className={[
+        "ingame-landscape-stage relative flex flex-col justify-between casino-hall-bg text-white overflow-hidden select-none",
+        isBombShaking ? "animate-screen-bomb" : "",
+      ].join(" ")}
+    >
+      {/* DEKORASI RUANGAN GRAND CASINO LOUNGE */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute top-0 left-8 w-20 h-36 bg-gradient-to-b from-amber-500/10 via-stone-800/20 to-transparent border-x border-amber-500/15 blur-[1px]" />
+        <div className="absolute top-0 right-8 w-20 h-36 bg-gradient-to-b from-amber-500/10 via-stone-800/20 to-transparent border-x border-amber-500/15 blur-[1px]" />
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-40 rounded-full bg-amber-500/15 blur-3xl" />
 
-          {gameState.roundNumber > 0 && (
-            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200">
-              Ronde #{gameState.roundNumber} •{" "}
-              {gameState.mustCollectThrees ? (
-                <span className="text-amber-400">Mode Kumpul 3 (3♠ Awal)</span>
-              ) : (
-                <span className="text-emerald-400">Mode Juara 1 Jalan Awal</span>
-              )}
-            </div>
+        {/* Partikel Cahaya Emas Mengambang */}
+        <div className="absolute top-1/4 left-1/5 w-1.5 h-1.5 rounded-full bg-amber-300 animate-ambient-particle" />
+        <div
+          className="absolute top-1/3 right-1/4 w-2 h-2 rounded-full bg-purple-400 animate-ambient-particle"
+          style={{ animationDelay: "1.2s" }}
+        />
+        <div
+          className="absolute bottom-1/3 left-1/3 w-1.5 h-1.5 rounded-full bg-amber-200 animate-ambient-particle"
+          style={{ animationDelay: "2.4s" }}
+        />
+      </div>
+
+      {/* ================================================================= */}
+      {/* FLOATING SINGLE SETTINGS BUTTON (PENGGANTI NAVBAR)                */}
+      {/* ================================================================= */}
+      <div className="absolute top-3 right-3 z-40">
+        <button
+          type="button"
+          onClick={() => setIsSettingsOpen((prev) => !prev)}
+          title="Pengaturan, Info Room & Papan Poin"
+          className="w-10 h-10 rounded-2xl bg-slate-950/90 hover:bg-slate-900 border-2 border-amber-400/60 shadow-[0_6px_20px_rgba(0,0,0,0.8)] flex items-center justify-center text-amber-300 hover:text-white transition transform hover:scale-105"
+        >
+          {isSettingsOpen ? (
+            <X className="w-5 h-5" />
+          ) : (
+            <Settings className="w-5 h-5" />
           )}
-        </div>
+        </button>
 
-        {/* Status Koneksi & Tombol Panduan/Keluar */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsRulesOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-semibold text-amber-300 transition"
-          >
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="hidden sm:inline">Aturan & Audit Kocok</span>
-            <BookOpen className="w-3.5 h-3.5 sm:hidden" />
-          </button>
+        {isSettingsOpen && (
+          <>
+            {/* Backdrop transparan agar klik di luar langsung menutup menu */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setIsSettingsOpen(false)}
+            />
 
-          <button
-            onClick={onLeaveRoom}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-xs font-semibold text-rose-200 transition"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Keluar</span>
-          </button>
-        </div>
-      </header>
-
-      {/* NOTIFIKASI KOCOK ULANG OTOMATIS (REDEAL) JIKA TERJADI DI RONDE INI */}
-      {gameState.shuffleMeta &&
-        gameState.shuffleMeta.redealHistory.length > 0 &&
-        gameState.phase !== "waiting" && (
-          <div className="bg-amber-500/20 border-b border-amber-400/50 px-4 py-2 text-center text-xs sm:text-sm text-amber-200 flex items-center justify-center gap-2">
-            <RotateCcw className="w-4 h-4 text-amber-400 shrink-0 animate-spin" />
-            <span>
-              <strong>BOM KOCOK ULANG OTOMATIS!</strong>{" "}
-              {
-                gameState.shuffleMeta.redealHistory[
-                  gameState.shuffleMeta.redealHistory.length - 1
-                ].description
-              }
-            </span>
-          </div>
-        )}
-
-      {/* AREA UTAMA MEJA */}
-      <main className="flex-1 flex flex-col justify-between max-w-6xl w-full mx-auto px-3 py-2 sm:px-5 sm:py-3 gap-2.5">
-        {/* BARIS LAWAN & PAPAN SKOR */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 items-start">
-          {/* Papan Skor Ringkas */}
-          <div className="bg-slate-950/75 border border-emerald-500/25 rounded-2xl p-3 shadow-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                <Trophy className="w-3.5 h-3.5" /> Papan Poin ({gameState.players.length} Pemain)
-              </span>
-              <span className="text-[11px] text-slate-400">
-                {supabaseReady ? "🟢 Online" : "🟡 Lokal/Multi-Tab"}
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              {[...gameState.players]
-                .sort((a, b) => b.totalScore - a.totalScore)
-                .map((p, idx) => (
-                  <div
-                    key={p.id}
-                    className={[
-                      "flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs",
-                      p.id === myPlayer?.id
-                        ? "bg-emerald-900/50 border border-emerald-500/40 font-semibold"
-                        : "bg-slate-900/60",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="text-slate-400 font-mono">#{idx + 1}</span>
-                      <span className="truncate">{p.name}</span>
-                      {p.id === myPlayer?.id && (
-                        <span className="text-[10px] px-1.5 py-0.2 bg-emerald-600 rounded text-white">
-                          Kamu
-                        </span>
-                      )}
-                      {p.finishRank && (
-                        <span className="text-[10px] px-1.5 py-0.2 bg-amber-500 text-slate-950 font-bold rounded">
-                          Juara {p.finishRank}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {p.lastRoundDelta !== 0 && (
-                        <span
-                          className={
-                            p.lastRoundDelta > 0
-                              ? "text-[10px] text-emerald-400"
-                              : "text-[10px] text-rose-400"
-                          }
-                        >
-                          ({p.lastRoundDelta > 0 ? `+${p.lastRoundDelta}` : p.lastRoundDelta})
-                        </span>
-                      )}
-                      <span
-                        className={[
-                          "font-mono font-bold px-1.5 py-0.5 rounded",
-                          p.totalScore > 0
-                            ? "text-emerald-300 bg-emerald-950"
-                            : p.totalScore < 0
-                            ? "text-rose-300 bg-rose-950"
-                            : "text-slate-300 bg-slate-800",
-                        ].join(" ")}
-                      >
-                        {p.totalScore > 0 ? `+${p.totalScore}` : p.totalScore} pts
-                      </span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          {/* Kartu Lawan di Meja */}
-          <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {opponents.map((opp) => {
-              const isOppTurn =
-                gameState.phase === "playing" &&
-                gameState.currentTurnPlayerId === opp.id;
-              return (
-                <div
-                  key={opp.id}
-                  className={[
-                    "relative flex flex-col justify-between p-3.5 rounded-2xl border transition-all",
-                    isOppTurn
-                      ? "bg-amber-500/15 border-amber-400 ring-2 ring-amber-400/50 shadow-lg"
-                      : "bg-slate-950/65 border-slate-800",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 truncate">
-                      <div className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center font-bold text-sm shrink-0">
-                        {opp.isBot ? (
-                          <Bot className="w-4 h-4 text-amber-300" />
-                        ) : (
-                          opp.name.charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div className="truncate">
-                        <div className="font-bold text-sm truncate flex items-center gap-1.5">
-                          {opp.name}
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          Poin:{" "}
-                          <span className="text-white font-semibold">
-                            {opp.totalScore > 0
-                              ? `+${opp.totalScore}`
-                              : opp.totalScore}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Badge Status Lawan */}
-                    {isOppTurn && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-extrabold text-[11px] animate-pulse">
-                        GILIRAN JALAN
-                      </span>
-                    )}
-                    {opp.finishRank !== null && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-extrabold text-[11px]">
-                        JUARA #{opp.finishRank}
-                      </span>
-                    )}
-                    {!isOppTurn &&
-                      opp.finishRank === null &&
-                      opp.hasPassedThisTrick && (
-                        <span className="px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-semibold text-[11px]">
-                          LEWAT (PASS)
-                        </span>
-                      )}
-                  </div>
-
-                  {/* Info Sisa Kartu & Kumpul 3 Lawan */}
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 font-semibold text-amber-300">
-                        🂠 {opp.hand.length} Kartu Tersisa
-                      </div>
-                    </div>
-                    {opp.collectedThrees.length > 0 && (
-                      <div className="text-[11px] text-emerald-300 font-medium">
-                        Kumpul 3:{" "}
-                        {opp.collectedThrees
-                          .map(
-                            (c) =>
-                              `3${
-                                c.suit === "spades"
-                                  ? "♠"
-                                  : c.suit === "hearts"
-                                  ? "♥"
-                                  : c.suit === "clubs"
-                                  ? "♣"
-                                  : "♦"
-                              }`
-                          )
-                          .join(" ")}
-                      </div>
-                    )}
-                  </div>
+            <div className="relative z-50 mt-2 w-72 sm:w-80 bg-slate-950/95 border-2 border-amber-400/70 rounded-2xl p-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.95)] backdrop-blur-xl space-y-3 animate-taunt-pop">
+              {/* 1. Info Room & Ronde */}
+              <div className="space-y-1.5 pb-2.5 border-b border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-amber-400">
+                    Pengaturan & Info Meja
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {supabaseReady ? "🟢 Online" : "🟡 Lokal"}
+                  </span>
                 </div>
-              );
-            })}
 
-            {opponents.length === 0 && (
-              <div className="sm:col-span-3 flex items-center justify-center p-6 rounded-2xl border border-dashed border-emerald-500/30 bg-slate-950/40 text-slate-300 text-sm">
-                Belum ada lawan di meja. Tambahkan Bot atau bagikan Kode Room{" "}
-                <strong className="mx-1 text-amber-400 font-mono">
-                  {gameState.roomCode}
-                </strong>{" "}
-                ke temanmu!
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ================================================================= */}
-        {/* TENGAH MEJA (FELT ARENA): LOBBY / KUMPUL 3 / PLAYING / ROUND END */}
-        {/* ================================================================= */}
-        <div className="relative flex-1 min-h-[195px] flex flex-col items-center justify-center rounded-3xl border-4 border-amber-500/30 bg-radial from-felt-light to-felt-dark shadow-inner p-3 sm:p-4">
-          {/* 1. FASE WAITING (LOBBY MEJA) */}
-          {gameState.phase === "waiting" && (
-            <div className="w-full max-w-lg bg-slate-950/85 border border-emerald-500/30 rounded-2xl p-5 sm:p-6 text-center space-y-5 shadow-2xl">
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold">
-                  <Users className="w-3.5 h-3.5" /> Ruang Tunggu Pemain (
-                  {gameState.players.length}/4 Pemain)
-                </div>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-white">
-                  Siap Mulai Permainan?
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-300">
-                  Bagikan kode room{" "}
-                  <span className="font-mono font-bold text-amber-400">
-                    {gameState.roomCode}
-                  </span>{" "}
-                  ke temanmu (bisa buka tab baru untuk tes multi-pemain) atau tambahkan Bot untuk langsung bermain!
-                </p>
-              </div>
-
-              {/* Daftar Pemain di Kursi */}
-              <div className="space-y-2 text-left">
-                {gameState.players.map((p, i) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-6 h-6 rounded-full bg-emerald-700 text-xs font-bold flex items-center justify-center">
-                        {i + 1}
-                      </span>
-                      <span className="font-semibold text-sm">{p.name}</span>
-                      {p.id === gameState.hostId && (
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                          Host
-                        </span>
-                      )}
-                      {p.isBot && (
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                          Bot AI
-                        </span>
-                      )}
-                    </div>
-
-                    {isHost && p.id !== myPlayer?.id && (
-                      <button
-                        onClick={() => handleRemovePlayer(p.id)}
-                        className="p-1 text-slate-400 hover:text-rose-400 transition"
-                        title="Keluarkan dari meja"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                <div className="flex items-center justify-between bg-slate-900 border border-amber-400/40 px-3 py-1.5 rounded-xl">
+                  <div className="text-xs">
+                    <span className="text-slate-400 mr-1.5">Kode Room:</span>
+                    <span className="font-mono font-black text-amber-300 tracking-wider">
+                      {gameState.roomCode}
+                    </span>
                   </div>
-                ))}
-              </div>
-
-              {/* Tombol Tambah Bot & Mulai */}
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                {gameState.players.length < 4 && (
                   <button
-                    onClick={handleAddBot}
-                    disabled={isSubmitting}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm font-semibold text-amber-300 transition"
+                    type="button"
+                    onClick={handleCopyRoomCode}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-bold transition"
                   >
-                    <UserPlus className="w-4 h-4" />
-                    Tambah Lawan Bot ({gameState.players.length}/4)
+                    {copiedCode ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-300">Tersalin</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Salin</span>
+                      </>
+                    )}
                   </button>
+                </div>
+
+                {gameState.roundNumber > 0 && (
+                  <div className="flex items-center justify-between text-[11px] px-1 text-slate-300">
+                    <span>Ronde #{gameState.roundNumber}</span>
+                    <span className="font-bold text-amber-300">
+                      {gameState.mustCollectThrees
+                        ? "Kumpul 3 (3♠ Awal)"
+                        : "Juara 1 Jalan Awal"}
+                    </span>
+                  </div>
                 )}
 
+                {gameState.shuffleMeta &&
+                  gameState.shuffleMeta.redealHistory.length > 0 && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-[10px] text-amber-200">
+                      <RotateCcw className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span className="truncate">
+                        Redeal Otomatis:{" "}
+                        {gameState.shuffleMeta.redealHistory.length}x
+                      </span>
+                    </div>
+                  )}
+              </div>
+
+              {/* 2. Kontrol Suara & Tema Meja */}
+              <div className="space-y-1.5 pb-2.5 border-b border-slate-800">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Suara & Tampilan Meja
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleToggleBgm}
+                    className={[
+                      "flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl border text-[11px] font-bold transition",
+                      bgmOn
+                        ? "bg-amber-500/20 border-amber-400/60 text-amber-300"
+                        : "bg-slate-900 border-slate-800 text-slate-400",
+                    ].join(" ")}
+                  >
+                    <Music className="w-3.5 h-3.5" />
+                    <span>{bgmOn ? "BGM On" : "BGM Off"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleSfx}
+                    className={[
+                      "flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl border text-[11px] font-bold transition",
+                      sfxOn
+                        ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
+                        : "bg-slate-900 border-slate-800 text-slate-400",
+                    ].join(" ")}
+                  >
+                    {sfxOn ? (
+                      <Volume2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <VolumeX className="w-3.5 h-3.5" />
+                    )}
+                    <span>{sfxOn ? "SFX On" : "SFX Off"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCycleTheme}
+                    className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-200 transition"
+                  >
+                    <Palette className="w-3.5 h-3.5 text-fuchsia-400" />
+                    <span className="capitalize">{feltTheme}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Klasemen Poin */}
+              <div className="space-y-1.5 pb-2.5 border-b border-slate-800">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                  <Trophy className="w-3 h-3" /> Klasemen Poin
+                </div>
+                <div className="space-y-1">
+                  {[...gameState.players]
+                    .sort((a, b) => b.totalScore - a.totalScore)
+                    .map((p, i) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between text-xs px-2.5 py-1 rounded-lg bg-slate-900"
+                      >
+                        <span className="font-bold truncate">
+                          #{i + 1} {p.name}
+                        </span>
+                        <span
+                          className={[
+                            "font-mono font-extrabold",
+                            p.totalScore > 0
+                              ? "text-emerald-400"
+                              : p.totalScore < 0
+                              ? "text-rose-400"
+                              : "text-slate-300",
+                          ].join(" ")}
+                        >
+                          {p.totalScore > 0 ? `+${p.totalScore}` : p.totalScore}{" "}
+                          pts
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* 4. Tombol Panduan Aturan & Keluar Room */}
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={handleStartRound}
-                  disabled={gameState.players.length < 2 || isSubmitting}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-40 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/25 transition"
+                  type="button"
+                  onClick={() => {
+                    setIsSettingsOpen(false);
+                    setIsRulesOpen(true);
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-xs font-bold text-emerald-300 transition"
                 >
-                  <Play className="w-4 h-4 fill-current" />
-                  Bagikan 52 Kartu & Mulai ({gameState.players.length} Orang)
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Aturan & Audit</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSettingsOpen(false);
+                    setIsLeaveConfirmOpen(true);
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-950/90 hover:bg-rose-900 border border-rose-500/50 text-xs font-bold text-rose-200 transition"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Keluar Meja</span>
                 </button>
               </div>
             </div>
-          )}
+          </>
+        )}
+      </div>
 
-          {/* 2. FASE COLLECTING THREES (KUMPUL ANGKA 3) */}
-          {gameState.phase === "collecting_threes" && (
-            <div className="w-full max-w-2xl bg-slate-950/85 border-2 border-amber-400/50 rounded-2xl p-5 sm:p-6 text-center space-y-5 shadow-2xl">
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5" /> Aturan Pembuka Ronde
-                </div>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-white">
-                  Fase Kumpul Angka 3!
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-300">
-                  Semua pemain wajib mengeluarkan seluruh kartu angka{" "}
-                  <strong className="text-amber-300">3</strong> di awal permainan. Pemegang{" "}
-                  <strong className="text-amber-400">3 Sekop (3♠)</strong> akan jalan paling pertama!
-                </p>
+      {/* ================================================================= */}
+      {/* ARENA UTAMA (HORIZONTAL DI HP & DESKTOP, TIDAK AKAN OVERFLOW)     */}
+      {/* ================================================================= */}
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col justify-between max-w-7xl w-full mx-auto px-2 sm:px-6 py-1 lg:py-1.5">
+        {/* ZONA ATAS & TENGAH: KURSI LAWAN (KIRI, ATAS, KANAN) + MEJA OVAL 3D */}
+        <div className="relative flex-1 min-h-0 flex flex-col items-center justify-center w-full">
+          {/* KURSI LAWAN ATAS */}
+          <div className="flex justify-center items-center shrink-0 -mb-2 z-20 scale-90 lg:scale-100">
+            {seatAssignments.top ? (
+              <PlayerSeat3D
+                player={seatAssignments.top}
+                position="top"
+                isCurrentTurn={
+                  gameState.phase === "playing" &&
+                  gameState.currentTurnPlayerId === seatAssignments.top.id
+                }
+                activeTaunt={visibleTaunts[seatAssignments.top.id] || null}
+              />
+            ) : null}
+          </div>
+
+          {/* CONTAINER MEJA 3D + KURSI KIRI & KANAN */}
+          <div className="relative w-full flex items-center justify-center">
+            {/* KURSI LAWAN KIRI */}
+            {seatAssignments.left && (
+              <div className="flex absolute left-0.5 lg:left-3 top-1/2 -translate-y-1/2 z-20 scale-90 lg:scale-100">
+                <PlayerSeat3D
+                  player={seatAssignments.left}
+                  position="left"
+                  isCurrentTurn={
+                    gameState.phase === "playing" &&
+                    gameState.currentTurnPlayerId === seatAssignments.left.id
+                  }
+                  activeTaunt={visibleTaunts[seatAssignments.left.id] || null}
+                />
               </div>
+            )}
 
-              {/* Kartu 3 yang Sudah Terkumpul di Meja */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-                {gameState.players.map((p) => {
-                  const entry = gameState.collectedThreesPool.find(
-                    (e) => e.playerId === p.id
-                  );
-                  return (
-                    <div
-                      key={p.id}
-                      className={[
-                        "p-3 rounded-xl border flex items-center justify-between",
-                        entry?.hasThreeOfSpades
-                          ? "bg-amber-500/20 border-amber-400"
-                          : entry
-                          ? "bg-emerald-950/60 border-emerald-500/30"
-                          : "bg-slate-900/60 border-slate-800",
-                      ].join(" ")}
-                    >
-                      <div>
-                        <div className="font-bold text-sm flex items-center gap-1.5">
-                          {p.name}
-                          {entry?.hasThreeOfSpades && (
-                            <span className="px-2 py-0.5 text-[10px] bg-amber-400 text-slate-950 font-extrabold rounded-full">
-                              👑 PEMILIK 3♠
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-300 mt-0.5">
-                          {!entry ? (
-                            <span className="text-amber-300 animate-pulse">
-                              Menunggu kumpul angka 3...
-                            </span>
-                          ) : entry.cards.length === 0 ? (
-                            <span className="text-slate-400">
-                              Tidak memegang angka 3
-                            </span>
-                          ) : (
-                            <span className="text-emerald-300 font-semibold">
-                              Mengumpulkan {entry.cards.length} kartu 3
-                            </span>
-                          )}
-                        </div>
+            {/* KURSI LAWAN KANAN */}
+            {seatAssignments.right && (
+              <div className="flex absolute right-0.5 lg:right-3 top-1/2 -translate-y-1/2 z-20 scale-90 lg:scale-100">
+                <PlayerSeat3D
+                  player={seatAssignments.right}
+                  position="right"
+                  isCurrentTurn={
+                    gameState.phase === "playing" &&
+                    gameState.currentTurnPlayerId === seatAssignments.right.id
+                  }
+                  activeTaunt={visibleTaunts[seatAssignments.right.id] || null}
+                />
+              </div>
+            )}
+
+            {/* ============================================================= */}
+            {/* MEJA KASINO OVAL 3D PERSPEKTIF (UKURAN FIXED BESAR & STABIL)  */}
+            {/* ============================================================= */}
+            <div className="perspective-stage w-full max-w-5xl mx-auto px-16 sm:px-20 lg:px-28">
+              <div className="table-3d-rim w-full rounded-[85px] sm:rounded-[155px] p-1.5 sm:p-2.5 lg:p-3.5 border-2 border-amber-400/50">
+                <div
+                  className={[
+                    "relative w-full h-[155px] lg:h-[250px] rounded-[75px] sm:rounded-[142px] border border-amber-300/40 flex flex-col items-center justify-center px-4 sm:px-10 py-1.5 lg:py-3 shadow-inner overflow-hidden",
+                    feltClass,
+                  ].join(" ")}
+                >
+                  {/* Garis Lingkar Dalam Meja Kasino Emas */}
+                  <div className="pointer-events-none absolute inset-2 sm:inset-3 rounded-[58px] sm:rounded-[118px] border border-amber-300/20" />
+
+                  {/* Watermark Tengah Meja */}
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center opacity-15">
+                    <img
+                      src="/logo.png"
+                      alt="Poker Barudak"
+                      className="h-16 sm:h-24 w-auto object-contain select-none"
+                    />
+                  </div>
+
+                  {/* 1. KONTEN MEJA SAAT WAITING (LOBBY MEJA) */}
+                  {gameState.phase === "waiting" && (
+                    <div className="relative z-10 w-full max-w-md bg-slate-950/90 border border-amber-400/40 rounded-2xl p-3 sm:p-4 text-center space-y-2.5 shadow-2xl">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-bold">
+                        <Users className="w-3 h-3" /> {gameState.players.length}/4 Pemain
                       </div>
 
-                      {entry && entry.cards.length > 0 && (
-                        <div className="flex -space-x-3">
-                          {entry.cards.map((c) => (
-                            <PlayingCard
-                              key={c.id}
-                              card={c}
-                              size="sm"
-                              disabled
-                            />
+                      <div className="grid grid-cols-2 gap-1.5 text-left">
+                        {gameState.players.map((p, i) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px]"
+                          >
+                            <span className="font-bold truncate">
+                              #{i + 1} {p.name}
+                            </span>
+                            {isHost && p.id !== myPlayer?.id && (
+                              <button
+                                onClick={() => handleRemovePlayer(p.id)}
+                                className="text-slate-400 hover:text-rose-400"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">
+                        {gameState.players.length < 4 && (
+                          <button
+                            onClick={handleAddBot}
+                            disabled={isSubmitting}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-400/40 text-[11px] font-bold text-amber-300 transition"
+                          >
+                            <UserPlus className="w-3 h-3" />+ Bot
+                          </button>
+                        )}
+
+                        <button
+                          onClick={handleStartRound}
+                          disabled={
+                            gameState.players.length < 2 || isSubmitting
+                          }
+                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs shadow-lg transition"
+                        >
+                          <Play className="w-3 h-3 fill-current" />
+                          Mulai
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. KONTEN MEJA SAAT FASE KUMPUL ANGKA 3 */}
+                  {gameState.phase === "collecting_threes" && (
+                    <div className="relative z-10 w-full max-w-md bg-slate-950/90 border border-amber-400/60 rounded-2xl p-3 text-center space-y-2.5 shadow-2xl">
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-black uppercase">
+                        <Sparkles className="w-3 h-3" /> Kumpul Angka 3
+                      </div>
+
+                      {/* Kartu 3 yang sudah terkumpul */}
+                      {gameState.collectedThreesPool.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                          {gameState.collectedThreesPool.map((entry) => (
+                            <div
+                              key={entry.playerId}
+                              className={[
+                                "px-2.5 py-1 rounded-lg border text-[11px] flex items-center gap-1.5 animate-card-throw",
+                                entry.hasThreeOfSpades
+                                  ? "bg-amber-500/25 border-amber-400"
+                                  : "bg-slate-900/90 border-slate-700",
+                              ].join(" ")}
+                            >
+                              <span className="font-bold">
+                                {entry.playerName}:
+                              </span>
+                              {entry.cards.length === 0 ? (
+                                <span className="text-slate-400 italic">-</span>
+                              ) : (
+                                <span className="font-black text-amber-300">
+                                  {entry.cards
+                                    .map(
+                                      (c) =>
+                                        `3${
+                                          c.suit === "spades"
+                                            ? "♠"
+                                            : c.suit === "hearts"
+                                            ? "♥"
+                                            : c.suit === "clubs"
+                                            ? "♣"
+                                            : "♦"
+                                        }`
+                                    )
+                                    .join(" ")}
+                                </span>
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}
+
+                      {myPlayer && !myPlayer.hasSubmittedThrees && (
+                        <button
+                          onClick={handleSubmitThrees}
+                          disabled={isSubmitting}
+                          className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-lg transition transform hover:scale-105"
+                        >
+                          {myThreesCount > 0
+                            ? `🃏 Kumpul Angka 3 (${myThreesCount})`
+                            : `✅ Lanjut`}
+                        </button>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                  )}
 
-              {/* Tombol Kumpul Angka 3 untuk Pemain */}
-              {myPlayer && !myPlayer.hasSubmittedThrees && (
-                <button
-                  onClick={handleSubmitThrees}
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-extrabold text-sm sm:text-base shadow-xl shadow-amber-500/25 transition transform hover:scale-[1.02]"
-                >
-                  {myThreesCount > 0
-                    ? `🃏 Keluarkan ${myThreesCount} Kartu Angka 3 Saya Sekarang`
-                    : `✅ Saya Tidak Punya Angka 3 — Siap Mulai`}
-                </button>
-              )}
-            </div>
-          )}
+                  {/* 3. KONTEN MEJA SAAT FASE BERMAIN AKTIF (HISTORI PER MEJA PEMAIN) */}
+                  {gameState.phase === "playing" && (
+                    <div className="relative z-10 w-full h-full flex flex-col items-center justify-between py-0.5">
+                      {/* ZONA ATAS MEJA: HISTORI KARTU PEMAIN ATAS (TOP) */}
+                      {seatAssignments.top && (
+                        <PlayerTableSlot
+                          player={seatAssignments.top}
+                          gameState={gameState}
+                        />
+                      )}
 
-          {/* 3. FASE PLAYING (ARENA BANTING KARTU) */}
-          {gameState.phase === "playing" && (
-            <div className="w-full flex flex-col items-center justify-center space-y-4">
-              {/* Banner Giliran Siapa */}
-              <div className="px-4 py-1.5 rounded-full bg-slate-950/80 border border-emerald-500/30 text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-md">
-                {isMyTurn ? (
-                  <span className="text-amber-400 font-extrabold flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4" /> GILIRAN KAMU JALAN!{" "}
-                    {!gameState.currentTablePlay &&
-                      "(Meja Kosong — Bebas Keluarkan Kombinasi Apa Saja)"}
-                  </span>
-                ) : (
-                  <span className="text-slate-200">
-                    Menunggu giliran:{" "}
-                    <strong className="text-amber-300">
-                      {
-                        gameState.players.find(
-                          (p) => p.id === gameState.currentTurnPlayerId
-                        )?.name
-                      }
-                    </strong>
-                  </span>
-                )}
-              </div>
+                      {/* ZONA TENGAH MEJA: HISTORI KIRI + STATUS TENGAH + HISTORI KANAN */}
+                      <div className="w-full flex items-center justify-between gap-1 sm:gap-2 px-1 sm:px-3">
+                        {/* Kiri: Histori Kartu Pemain Kiri */}
+                        <div className="flex-1 flex justify-start">
+                          {seatAssignments.left && (
+                            <PlayerTableSlot
+                              player={seatAssignments.left}
+                              gameState={gameState}
+                            />
+                          )}
+                        </div>
 
-              {/* Kartu yang Sedang Berada di Meja */}
-              {gameState.currentTablePlay ? (
-                <div className="flex flex-col items-center space-y-3 animate-card-pop">
-                  <div className="text-xs sm:text-sm bg-slate-950/90 px-4 py-1.5 rounded-full border border-amber-400/40 text-amber-300 font-bold shadow">
-                    {gameState.currentTablePlay.playerName} mengeluarkan:{" "}
-                    <span className="text-white">
-                      {gameState.currentTablePlay.combo.label}
-                    </span>
-                  </div>
+                        {/* Poros Tengah Meja: Status Giliran & Tombol Darurat BOM */}
+                        <div className="shrink-0 flex flex-col items-center justify-center text-center space-y-1">
+                          {isMyTurn && (
+                            <div className="px-2.5 py-0.5 rounded-full bg-slate-950/90 border border-amber-400/60 text-[10px] font-extrabold text-amber-300 shadow-lg flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" /> GILIRANMU
+                            </div>
+                          )}
 
-                  <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap py-2">
-                    {gameState.currentTablePlay.combo.cards.map((card) => (
-                      <PlayingCard
-                        key={card.id}
-                        card={card}
-                        size="lg"
-                        disabled
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="py-10 px-6 rounded-2xl border-2 border-dashed border-emerald-400/30 bg-emerald-950/30 text-center space-y-1">
-                  <div className="text-emerald-300 font-bold text-base">
-                    Meja Sedang Bersih
-                  </div>
-                  <div className="text-xs text-slate-300">
-                    Pemegang giliran bebas memulai dengan Single, Double, Triple, Seri Sejenis, atau Full House (3+2).
-                  </div>
-                </div>
-              )}
+                          {/* TOMBOL DARURAT BOM POKER JIKA LAWAN KELUARKAN SINGLE 2 */}
+                          {canDetonateBombNow && (
+                            <div className="bg-gradient-to-r from-red-950 via-red-800 to-red-950 border border-amber-300 rounded-xl px-2.5 py-1 text-center space-y-0.5 shadow-[0_0_20px_rgba(239,68,68,0.85)] animate-bounce">
+                              <div className="flex flex-wrap justify-center gap-1">
+                                {myBombs.map((bomb, idx) => (
+                                  <button
+                                    key={idx}
+                                    onClick={() =>
+                                      handleDetonateBombInstant(
+                                        bomb.cards.map((c) => c.id)
+                                      )
+                                    }
+                                    disabled={isSubmitting}
+                                    className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-amber-300 to-red-500 text-slate-950 font-black text-[10px] shadow hover:scale-105 transition flex items-center gap-1"
+                                  >
+                                    <Flame className="w-3 h-3" /> BOM ({bomb.label})
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
 
-              {/* TOMBOL INTERAKTIF SPESIAL: LEDAKKAN BOM SAAT LAWAN KELUARKAN 1 POKER! */}
-              {canDetonateBombNow && (
-                <div className="w-full max-w-xl bg-gradient-to-r from-red-950 via-red-900 to-red-950 border-2 border-amber-400 rounded-2xl p-4 text-center space-y-3 shadow-2xl animate-bounce">
-                  <div className="text-xs sm:text-sm font-extrabold text-amber-300 flex items-center justify-center gap-1.5 uppercase">
-                    <Flame className="w-5 h-5 text-amber-400" /> KESEMPATAN BOM! Lawan mengeluarkan 1 Kartu Poker (2)!
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    {myBombs.map((bomb, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() =>
-                          handleDetonateBombInstant(
-                            bomb.cards.map((c) => c.id)
-                          )
-                        }
-                        disabled={isSubmitting}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-red-500 hover:from-amber-300 hover:to-red-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition transform hover:scale-105"
-                      >
-                        💣 LEDAKKAN {bomb.label} (+10 Poin & Akhiri Game!)
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                        {/* Kanan: Histori Kartu Pemain Kanan */}
+                        <div className="flex-1 flex justify-end">
+                          {seatAssignments.right && (
+                            <PlayerTableSlot
+                              player={seatAssignments.right}
+                              gameState={gameState}
+                            />
+                          )}
+                        </div>
+                      </div>
 
-          {/* 4. FASE ROUND END (HASIL AKHIR RONDE & PERHITUNGAN POIN) */}
-          {gameState.phase === "round_end" && gameState.roundSummary && (
-            <div className="w-full max-w-xl bg-slate-950/95 border-2 border-amber-400/60 rounded-2xl p-5 sm:p-6 space-y-5 shadow-2xl animate-card-pop">
-              {gameState.roundSummary.endReason === "bomb" &&
-              gameState.roundSummary.bombResolution ? (
-                <div className="text-center space-y-2 bg-red-950/60 border border-red-500/50 rounded-xl p-4">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500 text-white text-xs font-black uppercase">
-                    <Flame className="w-4 h-4" /> PERMAINAN BERAKHIR KARENA BOM!
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-amber-300">
-                    💣 {gameState.roundSummary.bombResolution.bomberName}{" "}
-                    Mengebom Kartu Poker{" "}
-                    {gameState.roundSummary.bombResolution.victimName}!
-                  </h2>
-                  <p className="text-xs text-slate-200">
-                    Senjata Bom:{" "}
-                    <strong>
-                      {gameState.roundSummary.bombResolution.bombCombo.label}
-                    </strong>{" "}
-                    • Ronde berikutnya kembali di-reset ke{" "}
-                    <strong className="text-amber-300">
-                      Kumpul Angka 3 (3♠ Jalan Awal)
-                    </strong>
-                    !
-                  </p>
-                  <div className="flex items-center justify-center gap-1.5 pt-2">
-                    {gameState.roundSummary.bombResolution.bombCombo.cards.map(
-                      (c) => (
-                        <PlayingCard key={c.id} card={c} size="sm" disabled />
-                      )
+                      {/* ZONA BAWAH MEJA: HISTORI KARTU KAMU SENDIRI (BOTTOM) */}
+                      {myPlayer && (
+                        <PlayerTableSlot
+                          player={myPlayer}
+                          gameState={gameState}
+                          isMe
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* 4. KONTEN MEJA SAAT RONDE SELESAI (ROUND END) */}
+                  {gameState.phase === "round_end" &&
+                    gameState.roundSummary && (
+                      <div className="relative z-20 w-full max-w-md bg-slate-950/95 border border-amber-400 rounded-2xl p-3 text-center space-y-2 shadow-2xl animate-taunt-pop">
+                        {gameState.roundSummary.endReason === "bomb" &&
+                        gameState.roundSummary.bombResolution ? (
+                          <div className="space-y-0.5 bg-red-950/70 border border-red-500/50 rounded-xl p-2">
+                            <div className="text-[10px] font-black text-amber-300 uppercase">
+                              💥 BOM MELEDAK!
+                            </div>
+                            <div className="text-xs sm:text-sm font-black text-white">
+                              {gameState.roundSummary.bombResolution.bomberName}{" "}
+                              →{" "}
+                              {gameState.roundSummary.bombResolution.victimName}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-xs sm:text-sm font-black text-amber-300 flex items-center justify-center gap-1">
+                            <Crown className="w-3.5 h-3.5 text-amber-400" />{" "}
+                            Juara 1: {gameState.roundSummary.nextStarterName}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-1 text-[11px]">
+                          {gameState.roundSummary.rankings.map((r) => (
+                            <div
+                              key={r.playerId}
+                              className="flex items-center justify-between px-2 py-1 rounded-lg bg-slate-900 border border-slate-800"
+                            >
+                              <span className="font-bold truncate">
+                                {r.playerName}
+                              </span>
+                              <span
+                                className={[
+                                  "font-mono font-black",
+                                  r.scoreDelta > 0
+                                    ? "text-emerald-400"
+                                    : r.scoreDelta < 0
+                                    ? "text-rose-400"
+                                    : "text-slate-400",
+                                ].join(" ")}
+                              >
+                                {r.scoreDelta > 0
+                                  ? `+${r.scoreDelta}`
+                                  : r.scoreDelta}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={handleStartRound}
+                          disabled={isSubmitting}
+                          className="px-5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg transition"
+                        >
+                          🚀 Main Lagi
+                        </button>
+                      </div>
                     )}
-                  </div>
                 </div>
-              ) : (
-                <div className="text-center space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold">
-                    <Crown className="w-4 h-4 text-amber-400" /> Ronde #
-                    {gameState.roundSummary.roundNumber} Selesai Normal
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-white">
-                    Juara 1: {gameState.roundSummary.nextStarterName}!
-                  </h2>
-                  <p className="text-xs text-slate-300">
-                    Sesuai aturan: Di ronde berikutnya{" "}
-                    <strong className="text-amber-300">
-                      {gameState.roundSummary.nextStarterName}
-                    </strong>{" "}
-                    akan jalan paling awal (bebas mengeluarkan kartu apa saja tanpa kumpul angka 3).
-                  </p>
-                </div>
-              )}
-
-              {/* Tabel Perolehan Poin Ronde Ini */}
-              <div className="space-y-2">
-                {gameState.roundSummary.rankings.map((r) => (
-                  <div
-                    key={r.playerId}
-                    className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-bold text-xs px-2 py-0.5 rounded bg-slate-800 text-amber-300">
-                        {r.statusLabel}
-                      </span>
-                      <span className="font-bold text-white">
-                        {r.playerName}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 font-mono">
-                      <span
-                        className={[
-                          "font-extrabold",
-                          r.scoreDelta > 0
-                            ? "text-emerald-400"
-                            : r.scoreDelta < 0
-                            ? "text-rose-400"
-                            : "text-slate-400",
-                        ].join(" ")}
-                      >
-                        {r.scoreDelta > 0 ? `+${r.scoreDelta}` : r.scoreDelta}
-                      </span>
-                      <span className="text-xs text-slate-400">
-                        Total:{" "}
-                        <strong className="text-white">
-                          {r.newTotalScore > 0
-                            ? `+${r.newTotalScore}`
-                            : r.newTotalScore}
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-center pt-2">
-                <button
-                  onClick={handleStartRound}
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-sm sm:text-base shadow-xl transition"
-                >
-                  🚀 Kocok Kartu & Mulai Ronde #{gameState.roundNumber + 1}
-                </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* ================================================================= */}
-        {/* AREA TANGAN PEMAIN SENDIRI & PANEL KONTROL BAWAH                  */}
+        {/* BAGIAN BAWAH: DOCK KARTU COMPACT & KONTROL AKSI (ZERO-SCROLL)     */}
         {/* ================================================================= */}
-        {myPlayer && gameState.phase !== "waiting" && (
-          <div className="bg-slate-950/85 border border-emerald-500/30 rounded-3xl p-3 sm:p-4 space-y-2.5 shadow-2xl">
-            {/* Baris Info Kombinasi & Error */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-white">
-                  Tangan {myPlayer.name} ({myPlayer.hand.length} Kartu)
-                </span>
-                {myPlayer.collectedThrees.length > 0 && (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-medium">
-                    Angka 3 Terkumpul:{" "}
-                    {myPlayer.collectedThrees
-                      .map(
-                        (c) =>
-                          `3${
-                            c.suit === "spades"
-                              ? "♠"
-                              : c.suit === "hearts"
-                              ? "♥"
-                              : c.suit === "clubs"
-                              ? "♣"
-                              : "♦"
-                          }`
-                      )
-                      .join(", ")}
-                  </span>
-                )}
-              </div>
-
-              {/* Indikator Real-Time Kombinasi Kartu yang Dipilih */}
-              {selectedCardIds.length > 0 && (
-                <div className="text-xs font-semibold">
-                  {evaluatedSelectedCombo ? (
-                    beatValidation?.valid ? (
-                      <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300">
-                        ✅ {evaluatedSelectedCombo.label}{" "}
-                        {beatValidation.isBomb ? "(SIAP BOM!)" : "(Sah untuk Jalan)"}
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400 text-rose-300">
-                        ❌ {evaluatedSelectedCombo.label} —{" "}
-                        {beatValidation?.reason}
-                      </span>
-                    )
-                  ) : (
-                    <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400 text-amber-300">
-                      ⚠️ Pilihan belum membentuk kombinasi sah (Gunakan Single, Double, Triple, Seri Sejenis, Full House 3+2, atau Bom)
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
+        {myPlayer && (
+          <div className="relative z-20 shrink-0 pt-1">
+            {/* Pill Error Mengambang Ringkas */}
             {errorMsg && (
-              <div className="px-4 py-2 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs sm:text-sm font-medium">
-                ⚠️ {errorMsg}
+              <div className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 whitespace-nowrap">
+                <span className="px-3 py-0.5 rounded-full bg-rose-950/95 border border-rose-500 text-rose-200 text-[11px] font-bold shadow-lg">
+                  ⚠️ {errorMsg}
+                </span>
               </div>
             )}
 
-            {/* Barisan Kartu di Tangan Pemain */}
-            <div className="flex items-center justify-center flex-wrap gap-1.5 sm:gap-2 pt-3 pb-1 min-h-[120px]">
-              {myPlayer.hand.map((card) => {
-                const isSelected = selectedCardIds.includes(card.id);
-                const isBombCard = bombCardIdsSet.has(card.id);
-                return (
-                  <PlayingCard
-                    key={card.id}
-                    card={card}
-                    selected={isSelected}
-                    highlightBomb={isBombCard}
-                    disabled={gameState.phase !== "playing"}
-                    onClick={() => toggleCardSelection(card.id)}
-                  />
-                );
-              })}
-
-              {myPlayer.hand.length === 0 && (
-                <div className="text-emerald-400 font-bold text-sm py-8">
-                  🎉 Kartu kamu sudah habis! Menunggu ronde selesai...
+            {/* Container Dock Bawah */}
+            <div className="bg-slate-950/90 border border-amber-500/30 rounded-2xl px-2.5 sm:px-4 py-1.5 sm:py-2 backdrop-blur-md shadow-2xl space-y-1.5">
+              {/* Baris 1: Kartu di Tangan Pemain (Tegak Lurus, Rapi, Tanpa Scrollbar!) */}
+              {gameState.phase !== "waiting" && (
+                <div
+                  className={[
+                    "w-full flex items-center justify-center flex-wrap pt-2 pb-0.5",
+                    myPlayer.hand.length > 14
+                      ? "-space-x-3 sm:-space-x-1.5 gap-y-1"
+                      : "-space-x-1.5 sm:space-x-0 sm:gap-1.5 gap-y-1",
+                  ].join(" ")}
+                >
+                  {myPlayer.hand.map((card) => {
+                    const isSelected = selectedCardIds.includes(card.id);
+                    const isBombCard = bombCardIdsSet.has(card.id);
+                    return (
+                      <PlayingCard
+                        key={card.id}
+                        card={card}
+                        selected={isSelected}
+                        highlightBomb={isBombCard}
+                        disabled={gameState.phase !== "playing"}
+                        onClick={() => toggleCardSelection(card.id)}
+                      />
+                    );
+                  })}
                 </div>
               )}
-            </div>
 
-            {/* Tombol Aksi saat Fase Bermain */}
-            {gameState.phase === "playing" && myPlayer.finishRank === null && (
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
+              {/* Baris 2: Karakter Kita + Tombol Ejek Lawan (Kiri) | Tombol Aksi (Kanan) */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pt-1.5 border-t border-slate-800/80">
+                {/* Kiri: Avatar Karakter Pemain + Tombol Emot Ngejek */}
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCycleHint}
-                    disabled={!isMyTurn && !canDetonateBombNow}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 border border-slate-600 text-xs sm:text-sm font-semibold text-amber-300 transition"
-                  >
-                    <Lightbulb className="w-4 h-4" />
-                    Saran Kombinasi ({myValidPlays.length})
-                  </button>
+                  <PlayerSeat3D
+                    player={myPlayer}
+                    position="bottom"
+                    isCurrentTurn={isMyTurn}
+                    isMe
+                    activeTaunt={visibleTaunts[myPlayer.id] || null}
+                    onDismissTaunt={handleDismissMyTaunt}
+                  />
 
-                  {selectedCardIds.length > 0 && (
+                  <div className="relative">
                     <button
                       type="button"
-                      onClick={() => setSelectedCardIds([])}
-                      className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs sm:text-sm text-slate-300 transition"
+                      onClick={() => setIsTauntMenuOpen((prev) => !prev)}
+                      className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-600 hover:to-indigo-700 border border-purple-400/60 shadow transition"
                     >
-                      Batal Pilih
+                      <MessageSquareMore className="w-3.5 h-3.5 text-amber-300" />
+                      <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-white">
+                        Ejek
+                      </span>
                     </button>
-                  )}
+
+                    {isTauntMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setIsTauntMenuOpen(false)}
+                        />
+                        <div className="absolute bottom-11 left-0 z-50 w-72 sm:w-80 bg-slate-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-[0_15px_40px_rgba(0,0,0,0.95)] space-y-2.5 animate-taunt-pop">
+                          <div className="text-[11px] font-black text-amber-300 uppercase tracking-wider flex items-center justify-between border-b border-slate-800 pb-1">
+                            <span>😈 Ejek Lawan</span>
+                            <button
+                              type="button"
+                              onClick={() => setIsTauntMenuOpen(false)}
+                              className="text-slate-400 hover:text-white text-xs px-1"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          {/* Form Ketik Ejekan Custom */}
+                          <form
+                            onSubmit={handleCustomTauntSubmit}
+                            className="space-y-1.5"
+                          >
+                            {/* Pilihan Emot Cepat untuk Custom Text */}
+                            <div className="flex items-center justify-between gap-1 bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-800">
+                              {[
+                                "😈",
+                                "😂",
+                                "🔥",
+                                "😜",
+                                "🤡",
+                                "💀",
+                                "👑",
+                                "💣",
+                              ].map((emo) => (
+                                <button
+                                  key={emo}
+                                  type="button"
+                                  onClick={() => setCustomTauntEmoji(emo)}
+                                  className={[
+                                    "w-6 h-6 rounded-lg flex items-center justify-center text-sm transition",
+                                    customTauntEmoji === emo
+                                      ? "bg-amber-400/30 border border-amber-400 scale-110"
+                                      : "hover:bg-slate-800 opacity-75 hover:opacity-100",
+                                  ].join(" ")}
+                                >
+                                  {emo}
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="flex gap-1.5">
+                              <input
+                                type="text"
+                                maxLength={60}
+                                autoFocus
+                                value={customTauntText}
+                                onChange={(e) =>
+                                  setCustomTauntText(e.target.value)
+                                }
+                                placeholder="Ketik ejekanmu..."
+                                className="flex-1 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-xs text-white font-semibold"
+                              />
+                              <button
+                                type="submit"
+                                disabled={!customTauntText.trim()}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs transition shrink-0"
+                              >
+                                Kirim
+                              </button>
+                            </div>
+                          </form>
+
+                          {/* Preset Ejekan Cepat 1-Klik */}
+                          <div className="grid grid-cols-2 gap-1 pt-1 border-t border-slate-800">
+                            {TAUNT_PRESETS.map((t) => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => handleSendTaunt(t.id)}
+                                className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-slate-900 hover:bg-purple-900/60 border border-slate-800 hover:border-amber-400/60 text-left transition"
+                              >
+                                <span className="text-base leading-none">
+                                  {t.emoji}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-100 leading-tight">
+                                  {t.text}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2.5">
+                {/* Kanan: Tombol Kapsul Aksi (Lewat & Banting Kartu) */}
+                <div className="flex items-center gap-1.5 ml-auto">
                   <button
                     type="button"
                     onClick={handlePassTurn}
                     disabled={
-                      !isMyTurn || !gameState.currentTablePlay || isSubmitting
+                      gameState.phase !== "playing" ||
+                      !isMyTurn ||
+                      !gameState.currentTablePlay ||
+                      isSubmitting
                     }
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 border border-slate-600 text-xs sm:text-sm font-bold text-slate-200 transition"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-rose-950 disabled:opacity-40 border border-slate-600 text-[11px] font-extrabold text-slate-200 shadow transition"
                   >
-                    <SkipForward className="w-4 h-4" />
-                    Lewat (Pass)
+                    <SkipForward className="w-3 h-3" />
+                    <span>Lewat</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handlePlaySelectedCards}
                     disabled={
+                      gameState.phase !== "playing" ||
                       selectedCardIds.length === 0 ||
                       !beatValidation?.valid ||
                       (!isMyTurn && !beatValidation?.isBomb) ||
                       isSubmitting
                     }
                     className={[
-                      "flex items-center gap-2 px-6 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm shadow-lg transition",
+                      "py-1.5 px-4 sm:px-5 rounded-full font-black text-[11px] sm:text-xs uppercase tracking-wider shadow-lg transition transform active:scale-95",
                       beatValidation?.isBomb
-                        ? "bg-gradient-to-r from-red-500 to-amber-500 text-slate-950 animate-pulse"
-                        : "bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 disabled:opacity-40",
+                        ? "bg-gradient-to-r from-red-500 via-amber-400 to-red-500 text-slate-950 animate-pulse"
+                        : "bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 disabled:opacity-35",
                     ].join(" ")}
                   >
-                    {beatValidation?.isBomb
-                      ? "💣 LEDAKKAN BOM!"
-                      : "🃏 Keluarkan Kartu"}
+                    {beatValidation?.isBomb ? "💣 BOM!" : "🃏 Banting Kartu"}
                   </button>
                 </div>
               </div>
-            )}
-
-            {/* Log Aktivitas Terakhir */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 flex items-center justify-between gap-2">
-              <div className="truncate">
-                <span className="text-amber-400 font-semibold mr-1.5">
-                  Info Meja:
-                </span>
-                {gameState.logs[gameState.logs.length - 1]}
-              </div>
-              {gameState.shuffleMeta && (
-                <span className="text-[11px] text-emerald-400 font-mono shrink-0 hidden sm:inline">
-                  CSPRNG: 0x{gameState.shuffleMeta.entropyHex.slice(0, 8)}
-                </span>
-              )}
             </div>
           </div>
         )}
       </main>
+
+      {/* Modal Konfirmasi Keluar / Menyerah */}
+      {isLeaveConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-slate-950 border-2 border-rose-500/70 rounded-2xl p-5 text-center space-y-4 shadow-[0_20px_50px_rgba(0,0,0,0.95)] animate-taunt-pop">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-rose-500/20 border border-rose-400/50 flex items-center justify-center text-2xl">
+              🏳️
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black text-white">
+                Yakin Ingin Keluar dari Meja?
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Jika kamu keluar sekarang, kamu otomatis dinyatakan{" "}
+                <strong className="text-rose-400">KALAH (-10 pts)</strong> pada
+                permainan ini!
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsLeaveConfirmOpen(false)}
+                disabled={isSubmitting}
+                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-black text-white transition"
+              >
+                Lanjut Main
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmForfeitAndLeave}
+                disabled={isSubmitting}
+                className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-xs font-black text-white shadow-lg transition"
+              >
+                {isSubmitting ? "Keluar..." : "Ya, Keluar (Kalah)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Panduan Aturan & Audit Pengocokan */}
       <RulesModal
@@ -1152,4 +1467,3 @@ export default function GameTable({
     </div>
   );
 }
-

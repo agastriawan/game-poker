@@ -287,6 +287,46 @@ export function findAllBombsInHand(hand: Card[]): PlayedCombo[] {
 }
 
 /**
+ * Memeriksa apakah langkah kandidat melanggar aturan:
+ * "Kartu Poker (2) TIDAK BOLEH ditaruh di paling akhir!"
+ * - Tidak boleh menghabiskan kartu di tangan (sisa 0 kartu) menggunakan kombinasi yang mengandung Poker (2).
+ * - Tidak boleh membuang kartu yang menyebabkan sisa kartu di tangan HANYA menyisakan kartu Poker (2),
+ *   karena itu otomatis memaksa kartu Poker menjadi kartu paling akhir.
+ */
+export function checkPokerLastCardViolation(
+  hand: Card[],
+  candidateCards: Card[]
+): {
+  violates: boolean;
+  reason?: string;
+} {
+  const selectedIds = new Set(candidateCards.map((c) => c.id));
+  const remainingHand = hand.filter((c) => !selectedIds.has(c.id));
+  const candidateHasPoker = candidateCards.some((c) => c.value === 15);
+
+  if (remainingHand.length === 0 && candidateHasPoker) {
+    return {
+      violates: true,
+      reason:
+        "Kartu Poker (2) tidak boleh ditaruh di paling akhir untuk menutup permainan!",
+    };
+  }
+
+  if (
+    remainingHand.length > 0 &&
+    remainingHand.every((c) => c.value === 15)
+  ) {
+    return {
+      violates: true,
+      reason:
+        "Tidak boleh menyisakan kartu Poker (2) di paling akhir! Keluarkan kartu Poker terlebih dahulu.",
+    };
+  }
+
+  return { violates: false };
+}
+
+/**
  * Mencari seluruh langkah yang valid dari tangan pemain terhadap `currentTable`.
  * Berguna untuk fitur "Hint / Saran Kartu" dan kecerdasan Bot AI.
  */
@@ -302,6 +342,16 @@ export function findAllValidPlays(
     return findAllBombsInHand(sorted);
   }
 
+  const pushIfLegal = (combo: PlayedCombo | null) => {
+    if (!combo) return;
+    const beat = canBeatPlay(combo, currentTable);
+    if (!beat.valid) return;
+    if (!beat.isBomb && checkPokerLastCardViolation(sorted, combo.cards).violates) {
+      return;
+    }
+    validPlays.push(combo);
+  };
+
   // Grup berdasarkan nilai angka
   const byValue = new Map<RankValue, Card[]>();
   for (const c of sorted) {
@@ -313,10 +363,7 @@ export function findAllValidPlays(
   // 1. Semua Single
   if (!currentTable || currentTable.type === "single") {
     for (const c of sorted) {
-      const combo = evaluateCombo([c]);
-      if (combo && canBeatPlay(combo, currentTable).valid) {
-        validPlays.push(combo);
-      }
+      pushIfLegal(evaluateCombo([c]));
     }
   }
 
@@ -324,10 +371,7 @@ export function findAllValidPlays(
   if (!currentTable || currentTable.type === "double") {
     for (const [, group] of byValue.entries()) {
       if (group.length >= 2) {
-        const combo = evaluateCombo(group.slice(0, 2));
-        if (combo && canBeatPlay(combo, currentTable).valid) {
-          validPlays.push(combo);
-        }
+        pushIfLegal(evaluateCombo(group.slice(0, 2)));
       }
     }
   }
@@ -336,10 +380,7 @@ export function findAllValidPlays(
   if (!currentTable || currentTable.type === "triple") {
     for (const [, group] of byValue.entries()) {
       if (group.length >= 3) {
-        const combo = evaluateCombo(group.slice(0, 3));
-        if (combo && canBeatPlay(combo, currentTable).valid) {
-          validPlays.push(combo);
-        }
+        pushIfLegal(evaluateCombo(group.slice(0, 3)));
       }
     }
   }
@@ -362,10 +403,7 @@ export function findAllValidPlays(
         if (suitCards.length < len) continue;
         for (let i = 0; i <= suitCards.length - len; i++) {
           const slice = suitCards.slice(i, i + len);
-          const combo = evaluateCombo(slice);
-          if (combo && canBeatPlay(combo, currentTable).valid) {
-            validPlays.push(combo);
-          }
+          pushIfLegal(evaluateCombo(slice));
         }
       }
     }
@@ -388,10 +426,7 @@ export function findAllValidPlays(
     for (const t of triplets) {
       for (const p of pairs) {
         if (t[0].value === p[0].value) continue;
-        const combo = evaluateCombo([...t, ...p]);
-        if (combo && canBeatPlay(combo, currentTable).valid) {
-          validPlays.push(combo);
-        }
+        pushIfLegal(evaluateCombo([...t, ...p]));
       }
     }
   }

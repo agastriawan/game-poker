@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   addPlayerToGame,
   createInitialGameState,
+  forfeitPlayer,
   passTurn,
   playCards,
   removePlayerFromGame,
+  sendTaunt,
   startNewRound,
   submitPlayerThrees,
 } from "@/lib/game/engine";
@@ -21,7 +23,9 @@ export async function POST(req: NextRequest) {
         | "start_round"
         | "submit_threes"
         | "play_cards"
-        | "pass_turn";
+        | "pass_turn"
+        | "send_taunt"
+        | "forfeit_game";
       state?: GameState;
       payload?: Record<string, unknown>;
     };
@@ -76,6 +80,24 @@ export async function POST(req: NextRequest) {
       case "pass_turn": {
         if (!state) throw new Error("State room tidak ditemukan.");
         nextState = passTurn(state, String(payload?.playerId));
+        break;
+      }
+
+      case "send_taunt": {
+        if (!state) throw new Error("State room tidak ditemukan.");
+        nextState = sendTaunt(
+          state,
+          String(payload?.playerId),
+          String(payload?.tauntId || "custom"),
+          payload?.customText ? String(payload.customText) : undefined,
+          payload?.customEmoji ? String(payload.customEmoji) : undefined
+        );
+        break;
+      }
+
+      case "forfeit_game": {
+        if (!state) throw new Error("State room tidak ditemukan.");
+        nextState = forfeitPlayer(state, String(payload?.playerId));
         break;
       }
 

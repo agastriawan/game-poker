@@ -138,6 +138,16 @@ export interface ShuffleMetadata {
   timestamp: number;
 }
 
+export interface TauntEvent {
+  id: string;
+  senderId: string;
+  senderName: string;
+  tauntId: string;
+  emoji: string;
+  text: string;
+  timestamp: number;
+}
+
 export interface GameState {
   roomCode: string;
   hostId: string;
@@ -158,6 +168,8 @@ export interface GameState {
   currentTablePlay: TablePlay | null;
   /** Riwayat kartu yang dibuang dalam trick saat ini (untuk visualisasi meja) */
   trickPile: TablePlay[];
+  /** Seluruh riwayat kartu yang dibuang oleh masing-masing pemain sepanjang ronde ini */
+  roundPlays?: TablePlay[];
   /** Daftar kartu angka 3 yang terkumpul di meja pada fase kumpul 3 */
   collectedThreesPool: CollectedThreeEntry[];
   /** Urutan ID pemain yang sudah menghabiskan kartu di ronde ini */
@@ -168,6 +180,8 @@ export interface GameState {
   shuffleMeta: ShuffleMetadata | null;
   /** Jejak kartu tangan ronde sebelumnya per playerId (untuk Anti-Similarity Guard) */
   previousHandsSignature: Record<string, string[]>;
+  /** Emot / Ejekan terbaru yang dikirim pemain atau Bot di meja */
+  latestTaunt?: TauntEvent | null;
   /** Log aktivitas terbaru di meja */
   logs: string[];
   updatedAt: number;

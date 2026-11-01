@@ -101,7 +101,9 @@ export async function dispatchGameAction(
     | "start_round"
     | "submit_threes"
     | "play_cards"
-    | "pass_turn",
+    | "pass_turn"
+    | "send_taunt"
+    | "forfeit_game",
   currentState?: GameState,
   payload?: Record<string, unknown>
 ): Promise<GameState> {

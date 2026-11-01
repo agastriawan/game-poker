@@ -1,4 +1,8 @@
-import { canBeatPlay, evaluateCombo } from "./rules";
+import {
+  canBeatPlay,
+  checkPokerLastCardViolation,
+  evaluateCombo,
+} from "./rules";
 import { dealFairHandsWithRedealCheck } from "./shuffle";
 import {
   BombResolution,
@@ -65,6 +69,7 @@ export function createInitialGameState(params: {
     currentTurnPlayerId: null,
     currentTablePlay: null,
     trickPile: [],
+    roundPlays: [],
     collectedThreesPool: [],
     finishedOrder: [],
     roundSummary: null,
@@ -203,6 +208,7 @@ export function startNewRound(state: GameState): GameState {
       currentTurnPlayerId: null,
       currentTablePlay: null,
       trickPile: [],
+      roundPlays: [],
       collectedThreesPool: [],
       finishedOrder: [],
       roundSummary: null,
@@ -229,6 +235,7 @@ export function startNewRound(state: GameState): GameState {
       currentTurnPlayerId: starter.id,
       currentTablePlay: null,
       trickPile: [],
+      roundPlays: [],
       collectedThreesPool: [],
       finishedOrder: [],
       roundSummary: null,
@@ -406,9 +413,22 @@ export function playCards(
     throw new Error(beatCheck.reason || "Kartu tidak bisa mengalahkan kartu di meja.");
   }
 
-  // Jika bukan langkah BOM, wajib sesuai giliran pemain saat ini
-  if (!beatCheck.isBomb && state.currentTurnPlayerId !== playerId) {
-    throw new Error("Belum giliran kamu untuk jalan!");
+  // Jika bukan langkah BOM, wajib sesuai giliran pemain saat ini & tidak boleh menaruh/menyisakan Poker di paling akhir
+  if (!beatCheck.isBomb) {
+    if (state.currentTurnPlayerId !== playerId) {
+      throw new Error("Belum giliran kamu untuk jalan!");
+    }
+
+    const lastCardViolation = checkPokerLastCardViolation(
+      player.hand,
+      selectedCards
+    );
+    if (lastCardViolation.violates) {
+      throw new Error(
+        lastCardViolation.reason ||
+          "Kartu Poker (2) tidak boleh ditaruh di paling akhir!"
+      );
+    }
   }
 
   // Jika langkah BOM, pastikan pemain yang mengeluarkan Single Poker bukan dirinya sendiri
@@ -493,6 +513,16 @@ export function playCards(
       timestamp: Date.now(),
     };
 
+    const bombTaunt = {
+      id: `taunt-bomb-${Date.now()}`,
+      senderId: player.id,
+      senderName: player.name,
+      tauntId: "bomb_warn",
+      emoji: "💣",
+      text: "Hahaha kena BOM mampus!",
+      timestamp: Date.now(),
+    };
+
     return {
       ...state,
       phase: "round_end",
@@ -502,7 +532,9 @@ export function playCards(
       currentTurnPlayerId: null,
       currentTablePlay: bombPlayEntry,
       trickPile: [...state.trickPile, bombPlayEntry],
+      roundPlays: [...(state.roundPlays || []), bombPlayEntry],
       roundSummary,
+      latestTaunt: bombTaunt,
       logs: newLogs,
       updatedAt: Date.now(),
     };
@@ -612,6 +644,7 @@ export function playCards(
       currentTurnPlayerId: null,
       currentTablePlay: newPlayEntry,
       trickPile: [...state.trickPile, newPlayEntry],
+      roundPlays: [...(state.roundPlays || []), newPlayEntry],
       finishedOrder: updatedFinishedOrder,
       roundSummary,
       logs: newLogs,
@@ -622,13 +655,50 @@ export function playCards(
   // Cari pemain berikutnya
   const nextTurnId = findNextActivePlayerId(updatedPlayers, playerId, true);
 
+  let autoBotTaunt = state.latestTaunt;
+  if (player.isBot) {
+    if (remainingHand.length === 0) {
+      autoBotTaunt = {
+        id: `taunt-win-${Date.now()}`,
+        senderId: player.id,
+        senderName: player.name,
+        tauntId: "ez",
+        emoji: "😎",
+        text: "Gampang banget (EZ)!",
+        timestamp: Date.now(),
+      };
+    } else if (combo.type === "full_house" || combo.type === "straight_flush") {
+      autoBotTaunt = {
+        id: `taunt-combo-${Date.now()}`,
+        senderId: player.id,
+        senderName: player.name,
+        tauntId: "fire",
+        emoji: "🔥",
+        text: "Senggol dong kombo maut!",
+        timestamp: Date.now(),
+      };
+    } else if (combo.primaryValue === 15) {
+      autoBotTaunt = {
+        id: `taunt-poker-${Date.now()}`,
+        senderId: player.id,
+        senderName: player.name,
+        tauntId: "laugh",
+        emoji: "😂",
+        text: "Awas kartu Poker lewat!",
+        timestamp: Date.now(),
+      };
+    }
+  }
+
   return {
     ...state,
     players: updatedPlayers,
     currentTurnPlayerId: nextTurnId,
     currentTablePlay: newPlayEntry,
     trickPile: [...state.trickPile, newPlayEntry],
+    roundPlays: [...(state.roundPlays || []), newPlayEntry],
     finishedOrder: updatedFinishedOrder,
+    latestTaunt: autoBotTaunt,
     logs: newLogs,
     updatedAt: Date.now(),
   };
@@ -725,4 +795,153 @@ export function passTurn(state: GameState, playerId: string): GameState {
     updatedAt: Date.now(),
   };
 }
+
+export const TAUNT_PRESETS: {
+  id: string;
+  emoji: string;
+  text: string;
+}[] = [
+  { id: "laugh", emoji: "😂", text: "Hahaha mampus!" },
+  { id: "trash", emoji: "😜", text: "Kartu ampas ya bos?" },
+  { id: "fire", emoji: "🔥", text: "Senggol dong!" },
+  { id: "bomb_warn", emoji: "💣", text: "Awas ada BOM siap meledak!" },
+  { id: "ez", emoji: "😎", text: "Gampang banget (EZ)!" },
+  { id: "slow", emoji: "⏳", text: "Lama amat mikirnya!" },
+  { id: "cry", emoji: "😭", text: "Ampun suhu, jangan dibom!" },
+  { id: "bait", emoji: "🃏", text: "Ayo keluarkan Pokermu!" },
+];
+
+/**
+ * Mengirim Emot / Ejekan (Taunt) ke seluruh meja permainan (mendukung teks custom maupun preset).
+ */
+export function sendTaunt(
+  state: GameState,
+  playerId: string,
+  tauntId: string,
+  customText?: string,
+  customEmoji?: string
+): GameState {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return state;
+
+  const trimmedCustom = customText ? customText.trim().slice(0, 60) : "";
+  const preset =
+    TAUNT_PRESETS.find((t) => t.id === tauntId) || TAUNT_PRESETS[0];
+
+  const finalEmoji = trimmedCustom ? customEmoji || "😈" : preset.emoji;
+  const finalText = trimmedCustom || preset.text;
+
+  const tauntEvent = {
+    id: `taunt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    senderId: player.id,
+    senderName: player.name,
+    tauntId: trimmedCustom ? "custom" : preset.id,
+    emoji: finalEmoji,
+    text: finalText,
+    timestamp: Date.now(),
+  };
+
+  return {
+    ...state,
+    latestTaunt: tauntEvent,
+    logs: [
+      ...state.logs.slice(-18),
+      `${finalEmoji} ${player.name}: "${finalText}"`,
+    ],
+    updatedAt: Date.now(),
+  };
+}
+
+/**
+ * Jika pemain memilih keluar saat permainan sedang berlangsung,
+ * pemain tersebut otomatis dinyatakan KALAH (-10 poin) dan ronde berakhir.
+ */
+export function forfeitPlayer(state: GameState, playerId: string): GameState {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return state;
+
+  if (state.phase === "waiting") {
+    return removePlayerFromGame(state, playerId);
+  }
+
+  const numPlayers = state.players.length;
+
+  // Urutkan pemain selain yang menyerah berdasarkan yang sudah selesai lebih dulu, lalu sisa kartu paling sedikit
+  const otherPlayers = state.players
+    .filter((p) => p.id !== playerId)
+    .sort((a, b) => {
+      if (a.finishRank !== null && b.finishRank !== null) {
+        return a.finishRank - b.finishRank;
+      }
+      if (a.finishRank !== null) return -1;
+      if (b.finishRank !== null) return 1;
+      return a.hand.length - b.hand.length;
+    });
+
+  const rankMap = new Map<string, number>();
+  otherPlayers.forEach((p, idx) => {
+    rankMap.set(p.id, idx + 1);
+  });
+  rankMap.set(playerId, numPlayers);
+
+  const updatedPlayers = state.players.map((p) => {
+    const rank = rankMap.get(p.id) || numPlayers;
+    const delta =
+      p.id === playerId ? -10 : getNormalScoreByRank(numPlayers, rank);
+    return {
+      ...p,
+      finishRank: rank,
+      lastRoundDelta: delta,
+      totalScore: p.totalScore + delta,
+    };
+  });
+
+  const firstWinner = otherPlayers[0];
+  const firstWinnerId = firstWinner ? firstWinner.id : null;
+  const firstWinnerName = firstWinner ? firstWinner.name : "Pemain";
+
+  const roundSummary: RoundSummary = {
+    roundNumber: state.roundNumber,
+    endReason: "normal",
+    rankings: [...updatedPlayers]
+      .sort((a, b) => (a.finishRank || 99) - (b.finishRank || 99))
+      .map((p) => ({
+        playerId: p.id,
+        playerName: p.name,
+        rank: p.finishRank,
+        scoreDelta: p.lastRoundDelta,
+        newTotalScore: p.totalScore,
+        statusLabel:
+          p.id === playerId
+            ? "🏳️ Keluar / Kalah (-10)"
+            : p.finishRank === 1
+            ? "🥇 Juara 1"
+            : `🏅 Juara ${p.finishRank}`,
+      })),
+    nextRoundMode: "collect_threes",
+    nextStarterId: firstWinnerId,
+    nextStarterName: firstWinnerName,
+  };
+
+  return {
+    ...state,
+    phase: "round_end",
+    mustCollectThrees: true,
+    previousWinnerId: null,
+    players: updatedPlayers,
+    currentTurnPlayerId: null,
+    finishedOrder: [
+      ...otherPlayers.map((p) => p.id),
+      playerId,
+    ],
+    roundSummary,
+    logs: [
+      ...state.logs.slice(-18),
+      `🏳️ ${player.name} keluar dari permainan dan dinyatakan KALAH (-10 pts)!`,
+    ],
+    updatedAt: Date.now(),
+  };
+}
+
+
 
