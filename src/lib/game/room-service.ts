@@ -20,8 +20,11 @@ export function generateRoomCode(): string {
  * Menyimpan state permainan ke localStorage dan memancarkan via BroadcastChannel (untuk multi-tab lokal)
  * serta menyimpan ke Supabase (untuk multiplayer online lintas perangkat).
  */
-export async function persistGameState(state: GameState): Promise<void> {
-  const code = state.roomCode.toUpperCase();
+export async function persistGameState(
+  state: GameState,
+  waitForRemote = true
+): Promise<void> {
+  const code = state.roomCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
   // 1. Simpan ke localStorage & BroadcastChannel untuk sinkronisasi instan antar-tab
   if (typeof window !== "undefined") {
@@ -35,10 +38,10 @@ export async function persistGameState(state: GameState): Promise<void> {
     }
   }
 
-  // 2. Jika Supabase terkonfigurasi, simpan ke tabel game_rooms & broadcast via Realtime
+  // 2. Simpan ke tabel game_rooms di Supabase untuk sinkronisasi lintas perangkat (Device lain)
   const supabase = getSupabaseClient();
   if (supabase) {
-    const { error } = await supabase.from("game_rooms").upsert(
+    const upsertPromise = supabase.from("game_rooms").upsert(
       {
         room_code: code,
         host_id: state.hostId,
@@ -50,8 +53,15 @@ export async function persistGameState(state: GameState): Promise<void> {
       { onConflict: "room_code" }
     );
 
-    if (error) {
-      console.warn("Supabase upsert warning (pastikan tabel game_rooms sudah dibuat):", error.message);
+    if (waitForRemote) {
+      const { error } = await upsertPromise;
+      if (error) {
+        console.warn("Supabase upsert warning:", error.message);
+      }
+    } else {
+      upsertPromise.then(({ error }) => {
+        if (error) console.warn("Supabase async upsert warning:", error.message);
+      });
     }
   }
 }
@@ -60,7 +70,8 @@ export async function persistGameState(state: GameState): Promise<void> {
  * Mengambil state permainan berdasarkan kode room (dari Supabase terlebih dahulu, lalu fallback localStorage).
  */
 export async function fetchRoomState(roomCode: string): Promise<GameState | null> {
-  const code = roomCode.toUpperCase().trim();
+  const code = roomCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!code) return null;
 
   const supabase = getSupabaseClient();
   if (supabase) {
@@ -71,7 +82,18 @@ export async function fetchRoomState(roomCode: string): Promise<GameState | null
       .maybeSingle();
 
     if (!error && data && data.state) {
-      return data.state as GameState;
+      const remoteState = data.state as GameState;
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(
+            `${LOCAL_ROOM_PREFIX}${code}`,
+            JSON.stringify(remoteState)
+          );
+        } catch {
+          // ignore
+        }
+      }
+      return remoteState;
     }
   }
 
@@ -96,6 +118,7 @@ export async function fetchRoomState(roomCode: string): Promise<GameState | null
 export async function dispatchGameAction(
   action:
     | "create_room"
+    | "create_bot_game"
     | "join_room"
     | "remove_player"
     | "start_round"
@@ -123,7 +146,15 @@ export async function dispatchGameAction(
   }
 
   const nextState = data.state as GameState;
-  await persistGameState(nextState);
+  const isPureBotGame =
+    action === "create_bot_game" ||
+    (nextState.players.length > 1 &&
+      nextState.players.filter((p) => !p.isBot).length <= 1 &&
+      action !== "create_room" &&
+      action !== "join_room");
+
+  // Untuk game lawan Bot murni, jangan blokir UI menunggu jaringan Supabase
+  await persistGameState(nextState, !isPureBotGame);
   return nextState;
 }
 
@@ -166,9 +197,11 @@ export function subscribeToRoom(
     });
   }
 
-  // 2. Listener Supabase Realtime (Postgres Changes pada tabel game_rooms)
+  // 2. Listener Supabase Realtime + Polling Fallback Lintas Perangkat
   const supabase = getSupabaseClient();
   if (supabase && isSupabaseConfigured()) {
+    let lastUpdatedAt = 0;
+
     const channel = supabase
       .channel(`room:${code}`)
       .on(
@@ -181,14 +214,31 @@ export function subscribeToRoom(
         },
         (payload) => {
           const row = payload.new as { state?: GameState } | undefined;
-          if (row && row.state) {
+          if (row && row.state && row.state.updatedAt >= lastUpdatedAt) {
+            lastUpdatedAt = row.state.updatedAt;
             onUpdate(row.state);
           }
         }
       )
       .subscribe();
 
+    const pollInterval = setInterval(async () => {
+      const { data, error } = await supabase
+        .from("game_rooms")
+        .select("state")
+        .eq("room_code", code)
+        .maybeSingle();
+      if (!error && data?.state) {
+        const remote = data.state as GameState;
+        if (remote.updatedAt > lastUpdatedAt) {
+          lastUpdatedAt = remote.updatedAt;
+          onUpdate(remote);
+        }
+      }
+    }, 2000);
+
     cleanups.push(() => {
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     });
   }

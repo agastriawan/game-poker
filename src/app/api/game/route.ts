@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     const { action, state, payload } = body as {
       action:
         | "create_room"
+        | "create_bot_game"
         | "join_room"
         | "remove_player"
         | "start_round"
@@ -38,6 +39,27 @@ export async function POST(req: NextRequest) {
         const hostId = String(payload?.hostId || "host-1");
         const hostName = String(payload?.hostName || "Pemain 1");
         nextState = createInitialGameState({ roomCode, hostId, hostName });
+        break;
+      }
+
+      case "create_bot_game": {
+        const roomCode = String(payload?.roomCode || "POKR01");
+        const hostId = String(payload?.hostId || "host-1");
+        const hostName = String(payload?.hostName || "Pemain 1");
+        const totalPlayers = Math.min(
+          4,
+          Math.max(2, Number(payload?.totalPlayers || 4))
+        );
+        let tempState = createInitialGameState({ roomCode, hostId, hostName });
+        const botNames = ["Bot Himiya", "Bot Riko", "Bot Sari"];
+        for (let i = 0; i < totalPlayers - 1; i++) {
+          tempState = addPlayerToGame(tempState, {
+            id: `bot-${i + 1}-${Date.now()}-${i}`,
+            name: botNames[i],
+            isBot: true,
+          });
+        }
+        nextState = startNewRound(tempState);
         break;
       }
 

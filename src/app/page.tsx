@@ -5,6 +5,7 @@ import {
   BookOpen,
   Bot,
   Dices,
+  Loader2,
   LogIn,
   Music,
   PlusCircle,
@@ -56,6 +57,7 @@ export default function HomePage() {
   const [joinCodeInput, setJoinCodeInput] = useState<string>("");
   const [activeGameState, setActiveGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadingLabel, setLoadingLabel] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
   const [selectedShowcaseIds, setSelectedShowcaseIds] = useState<string[]>([
@@ -196,17 +198,42 @@ export default function HomePage() {
     setSfxOn(active);
   };
 
+  const ensurePlayerId = (): string => {
+    if (playerId) return playerId;
+    if (typeof window !== "undefined") {
+      const existing = sessionStorage.getItem(SESSION_PLAYER_ID_KEY);
+      if (existing) {
+        setPlayerId(existing);
+        return existing;
+      }
+    }
+    const randBytes = new Uint8Array(4);
+    crypto.getRandomValues(randBytes);
+    const hex = Array.from(randBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const newId = `player-${hex}`;
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(SESSION_PLAYER_ID_KEY, newId);
+    }
+    setPlayerId(newId);
+    return newId;
+  };
+
   // Buat Room Online Baru
   const handleCreateRoom = async () => {
+    if (loading) return;
+    const activeId = ensurePlayerId();
     const cleanName = playerName.trim() || "Pemain 1";
     soundEngine.playCardSlam(false);
     setLoading(true);
+    setLoadingLabel("Membuat Room Mabar Online...");
     setErrorMsg(null);
     try {
       const roomCode = generateRoomCode();
       const state = await dispatchGameAction("create_room", undefined, {
         roomCode,
-        hostId: playerId,
+        hostId: activeId,
         hostName: cleanName,
       });
       setActiveGameState(state);
@@ -216,21 +243,25 @@ export default function HomePage() {
       );
     } finally {
       setLoading(false);
+      setLoadingLabel(null);
     }
   };
 
   // Gabung ke Room yang Sudah Ada
   const handleJoinRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    const code = joinCodeInput.toUpperCase().trim();
+    if (loading) return;
+    const code = joinCodeInput.toUpperCase().replace(/[^A-Z0-9]/g, "");
     const cleanName = playerName.trim() || "Pemain Baru";
     if (!code) {
       setErrorMsg("Masukkan kode room terlebih dahulu.");
       return;
     }
 
+    const activeId = ensurePlayerId();
     soundEngine.playCardSlam(false);
     setLoading(true);
+    setLoadingLabel(`Menghubungkan ke Room ${code}...`);
     setErrorMsg(null);
     try {
       const existingState = await fetchRoomState(code);
@@ -240,13 +271,13 @@ export default function HomePage() {
         );
       }
 
-      if (existingState.players.some((p) => p.id === playerId)) {
+      if (existingState.players.some((p) => p.id === activeId)) {
         setActiveGameState(existingState);
         return;
       }
 
       const nextState = await dispatchGameAction("join_room", existingState, {
-        playerId,
+        playerId: activeId,
         playerName: cleanName,
         isBot: false,
       });
@@ -257,33 +288,29 @@ export default function HomePage() {
       );
     } finally {
       setLoading(false);
+      setLoadingLabel(null);
     }
   };
 
-  // Main Cepat vs Bot (2, 3, atau 4 Pemain langsung bagi kartu!)
+  // Main Cepat vs Bot (1-Request Instan di Server!)
   const handleQuickPlayWithBots = async (totalPlayers: 2 | 3 | 4) => {
+    if (loading) return;
+    const activeId = ensurePlayerId();
     const cleanName = playerName.trim() || "Pemain 1";
     soundEngine.playCardSlam(true);
     setLoading(true);
+    setLoadingLabel(
+      `Menyiapkan Meja ${totalPlayers} Pemain & Mengocok Kartu...`
+    );
     setErrorMsg(null);
     try {
       const roomCode = generateRoomCode();
-      let state = await dispatchGameAction("create_room", undefined, {
+      const state = await dispatchGameAction("create_bot_game", undefined, {
         roomCode,
-        hostId: playerId,
+        hostId: activeId,
         hostName: cleanName,
+        totalPlayers,
       });
-
-      const botNames = ["Bot Himiya", "Bot Riko", "Bot Sari"];
-      for (let i = 0; i < totalPlayers - 1; i++) {
-        state = await dispatchGameAction("join_room", state, {
-          playerId: `bot-${i + 1}-${Date.now()}`,
-          playerName: botNames[i],
-          isBot: true,
-        });
-      }
-
-      state = await dispatchGameAction("start_round", state);
       setActiveGameState(state);
     } catch (err: unknown) {
       setErrorMsg(
@@ -291,6 +318,7 @@ export default function HomePage() {
       );
     } finally {
       setLoading(false);
+      setLoadingLabel(null);
     }
   };
 
@@ -573,9 +601,13 @@ export default function HomePage() {
                 type="button"
                 onClick={handleCreateRoom}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-[0_6px_20px_rgba(245,158,11,0.3)] transition transform active:scale-95"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm shadow-[0_6px_20px_rgba(245,158,11,0.3)] transition transform active:scale-95"
               >
-                <PlusCircle className="w-4 h-4" />
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <PlusCircle className="w-4 h-4" />
+                )}
                 Buat Room Mabar Baru (Dapatkan Kode)
               </button>
 
@@ -593,9 +625,13 @@ export default function HomePage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm transition shrink-0 shadow-lg"
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm transition shrink-0 shadow-lg"
                 >
-                  <LogIn className="w-4 h-4" />
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <LogIn className="w-4 h-4" />
+                  )}
                   Gabung
                 </button>
               </form>
@@ -662,6 +698,25 @@ export default function HomePage() {
 
       {/* Spacer Bawah Ringkas Tanpa Teks Panjang */}
       <div className="h-1 shrink-0" />
+
+      {/* Animasi Loading Saat Masuk Room / Mengocok Kartu */}
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-xs bg-slate-950/95 border-2 border-amber-400/70 rounded-3xl p-6 text-center space-y-3 shadow-[0_20px_50px_rgba(0,0,0,0.95)] animate-taunt-pop">
+            <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-amber-400/20" />
+              <div className="absolute inset-0 rounded-full border-4 border-amber-400 border-t-transparent animate-spin" />
+              <span className="text-2xl">🃏</span>
+            </div>
+            <div className="text-sm font-black text-amber-300">
+              {loadingLabel || "Memuat Meja Permainan..."}
+            </div>
+            <div className="text-[11px] text-slate-400 font-semibold">
+              Mohon tunggu sebentar...
+            </div>
+          </div>
+        </div>
+      )}
 
       <RulesModal
         isOpen={isRulesOpen}
