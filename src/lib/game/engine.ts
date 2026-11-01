@@ -131,8 +131,14 @@ export function removePlayerFromGame(
     .filter((p) => p.id !== playerId)
     .map((p, idx) => ({ ...p, seatIndex: idx }));
 
+  const nextHostId =
+    state.hostId === playerId
+      ? filtered.find((p) => !p.isBot)?.id || filtered[0]?.id || state.hostId
+      : state.hostId;
+
   return {
     ...state,
+    hostId: nextHostId,
     players: filtered,
     updatedAt: Date.now(),
   };
@@ -145,7 +151,13 @@ export function removePlayerFromGame(
  * - Jika terjadi Kocok Ulang, atau Ronde 1, atau habis kena Bom -> Masuk fase "collecting_threes" (Kumpul Angka 3).
  * - Jika ronde sebelumnya berakhir normal tanpa Kocok Ulang -> Juara 1 langsung jalan bebas tanpa kumpul angka 3.
  */
-export function startNewRound(state: GameState): GameState {
+export function startNewRound(
+  state: GameState,
+  requesterId?: string
+): GameState {
+  if (requesterId && state.hostId && requesterId !== state.hostId) {
+    throw new Error("Hanya pembuat room (Host) yang bisa memulai permainan!");
+  }
   if (state.players.length < 2 || state.players.length > 4) {
     throw new Error("Permainan membutuhkan 2 hingga 4 pemain.");
   }
@@ -792,6 +804,47 @@ export function passTurn(state: GameState, playerId: string): GameState {
     players: updatedPlayers,
     currentTurnPlayerId: nextTurnId,
     logs: newLogs,
+    updatedAt: Date.now(),
+  };
+}
+
+/**
+ * Jika waktu giliran pemain habis (20 detik) dan belum jalan:
+ * - Bila ada kartu di meja: otomatis dianggap Lewat (Pass).
+ * - Bila meja sedang kosong (giliran bebas): giliran bebas otomatis di-skip ke pemain aktif berikutnya.
+ */
+export function timeoutTurn(state: GameState, playerId: string): GameState {
+  if (state.phase !== "playing" || state.currentTurnPlayerId !== playerId) {
+    return state;
+  }
+
+  if (state.currentTablePlay) {
+    return passTurn(state, playerId);
+  }
+
+  const playerIdx = state.players.findIndex((p) => p.id === playerId);
+  if (playerIdx === -1) return state;
+
+  const player = state.players[playerIdx];
+  const resetPassPlayers = state.players.map((p) => ({
+    ...p,
+    hasPassedThisTrick: false,
+  }));
+
+  const nextLeaderId = findNextActivePlayerId(resetPassPlayers, playerId, true);
+  const nextLeaderName =
+    resetPassPlayers.find((p) => p.id === nextLeaderId)?.name || "Pemain";
+
+  return {
+    ...state,
+    players: resetPassPlayers,
+    currentTurnPlayerId: nextLeaderId,
+    currentTablePlay: null,
+    trickPile: [],
+    logs: [
+      ...state.logs.slice(-18),
+      `⏰ Waktu 20 detik habis! Giliran ${player.name} otomatis di-skip ke ${nextLeaderName}.`,
+    ],
     updatedAt: Date.now(),
   };
 }

@@ -7,8 +7,12 @@ import {
   Copy,
   Crown,
   Flame,
+  Headphones,
+  Loader2,
   LogOut,
   MessageSquareMore,
+  Mic,
+  MicOff,
   Music,
   Palette,
   Play,
@@ -38,6 +42,7 @@ import {
   findAllBombsInHand,
 } from "@/lib/game/rules";
 import { dispatchGameAction } from "@/lib/game/room-service";
+import { useVoiceChat } from "@/lib/game/useVoiceChat";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { GameState, PlayerState, TauntEvent } from "@/lib/game/types";
 
@@ -137,6 +142,7 @@ export default function GameTable({
   const [customTauntText, setCustomTauntText] = useState<string>("");
   const [customTauntEmoji, setCustomTauntEmoji] = useState<string>("😈");
   const [isBombShaking, setIsBombShaking] = useState<boolean>(false);
+  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number>(20);
 
   const lastPlayedTimestampRef = useRef<number>(0);
   const lastTauntIdRef = useRef<string>("");
@@ -157,6 +163,18 @@ export default function GameTable({
   const isMyTurn =
     gameState.phase === "playing" &&
     gameState.currentTurnPlayerId === myPlayer?.id;
+
+  const voice = useVoiceChat({
+    roomCode: gameState.roomCode,
+    myPlayerId: myPlayer?.id || myPlayerId,
+    players: gameState.players,
+  });
+
+  useEffect(() => {
+    if (voice.micError) {
+      setErrorMsg(voice.micError);
+    }
+  }, [voice.micError]);
 
   // Nyalakan BGM otomatis pada interaksi pertama di meja
   useEffect(() => {
@@ -204,6 +222,71 @@ export default function GameTable({
     setSelectedCardIds([]);
     setErrorMsg(null);
   }, [gameState.roundNumber, gameState.phase, gameState.currentTurnPlayerId]);
+
+  const gameStateRef = useRef<GameState>(gameState);
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  // Batas waktu giliran 20 detik per orang -> jika tidak jalan otomatis Auto-Skip
+  useEffect(() => {
+    const current = gameStateRef.current;
+    if (current.phase !== "playing" || !current.currentTurnPlayerId) {
+      setTurnSecondsLeft(20);
+      return;
+    }
+
+    const activePlayer = current.players.find(
+      (p) => p.id === current.currentTurnPlayerId
+    );
+    if (!activePlayer || activePlayer.isBot) {
+      setTurnSecondsLeft(20);
+      return;
+    }
+
+    setTurnSecondsLeft(20);
+    const turnStartedAt = Date.now();
+    let hasTriggeredTimeout = false;
+
+    const interval = setInterval(async () => {
+      const elapsedSec = Math.floor((Date.now() - turnStartedAt) / 1000);
+      const remaining = Math.max(0, 20 - elapsedSec);
+      setTurnSecondsLeft(remaining);
+
+      const shouldTriggerNow =
+        (isMyTurn && elapsedSec >= 20) ||
+        (!isMyTurn && isHost && elapsedSec >= 21);
+
+      if (shouldTriggerNow && !hasTriggeredTimeout) {
+        hasTriggeredTimeout = true;
+        clearInterval(interval);
+        soundEngine.playPassSound();
+        setSelectedCardIds([]);
+        try {
+          const next = await dispatchGameAction(
+            "timeout_turn",
+            gameStateRef.current,
+            {
+              playerId: activePlayer.id,
+            }
+          );
+          onStateChange(next);
+        } catch {
+          // ignore
+        }
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [
+    gameState.phase,
+    gameState.roundNumber,
+    gameState.currentTurnPlayerId,
+    gameState.trickPile.length,
+    isHost,
+    isMyTurn,
+    onStateChange,
+  ]);
 
   // Deteksi kartu baru dibanting ke meja -> bunyikan SFX banting kartu
   useEffect(() => {
@@ -463,7 +546,7 @@ export default function GameTable({
   };
 
   const handleAddBot = async () => {
-    if (gameState.players.length >= 4 || isSubmitting) return;
+    if (!isHost || gameState.players.length >= 4 || isSubmitting) return;
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
@@ -486,7 +569,7 @@ export default function GameTable({
   };
 
   const handleRemovePlayer = async (targetId: string) => {
-    if (isSubmitting) return;
+    if (!isHost || isSubmitting) return;
     setIsSubmitting(true);
     try {
       const next = await dispatchGameAction("remove_player", gameState, {
@@ -503,12 +586,14 @@ export default function GameTable({
   };
 
   const handleStartRound = async () => {
-    if (gameState.players.length < 2 || isSubmitting) return;
+    if (!isHost || gameState.players.length < 2 || isSubmitting) return;
     soundEngine.startBgm();
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
-      const next = await dispatchGameAction("start_round", gameState);
+      const next = await dispatchGameAction("start_round", gameState, {
+        playerId: myPlayer?.id,
+      });
       onStateChange(next);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Gagal memulai ronde.");
@@ -910,7 +995,15 @@ export default function GameTable({
                   gameState.phase === "playing" &&
                   gameState.currentTurnPlayerId === seatAssignments.top.id
                 }
+                turnSecondsLeft={
+                  gameState.phase === "playing" &&
+                  gameState.currentTurnPlayerId === seatAssignments.top.id
+                    ? turnSecondsLeft
+                    : null
+                }
                 activeTaunt={visibleTaunts[seatAssignments.top.id] || null}
+                isMicOn={Boolean(voice.peerMicOn[seatAssignments.top.id])}
+                isSpeaking={Boolean(voice.peerSpeaking[seatAssignments.top.id])}
               />
             ) : null}
           </div>
@@ -927,7 +1020,17 @@ export default function GameTable({
                     gameState.phase === "playing" &&
                     gameState.currentTurnPlayerId === seatAssignments.left.id
                   }
+                  turnSecondsLeft={
+                    gameState.phase === "playing" &&
+                    gameState.currentTurnPlayerId === seatAssignments.left.id
+                      ? turnSecondsLeft
+                      : null
+                  }
                   activeTaunt={visibleTaunts[seatAssignments.left.id] || null}
+                  isMicOn={Boolean(voice.peerMicOn[seatAssignments.left.id])}
+                  isSpeaking={Boolean(
+                    voice.peerSpeaking[seatAssignments.left.id]
+                  )}
                 />
               </div>
             )}
@@ -942,7 +1045,17 @@ export default function GameTable({
                     gameState.phase === "playing" &&
                     gameState.currentTurnPlayerId === seatAssignments.right.id
                   }
+                  turnSecondsLeft={
+                    gameState.phase === "playing" &&
+                    gameState.currentTurnPlayerId === seatAssignments.right.id
+                      ? turnSecondsLeft
+                      : null
+                  }
                   activeTaunt={visibleTaunts[seatAssignments.right.id] || null}
+                  isMicOn={Boolean(voice.peerMicOn[seatAssignments.right.id])}
+                  isSpeaking={Boolean(
+                    voice.peerSpeaking[seatAssignments.right.id]
+                  )}
                 />
               </div>
             )}
@@ -983,8 +1096,16 @@ export default function GameTable({
                             key={p.id}
                             className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px]"
                           >
-                            <span className="font-bold truncate">
+                            <span className="font-bold truncate flex items-center gap-1">
                               #{i + 1} {p.name}
+                              {p.id === gameState.hostId && (
+                                <span
+                                  title="Pembuat Room (Host)"
+                                  className="text-amber-400 text-[10px]"
+                                >
+                                  👑
+                                </span>
+                              )}
                             </span>
                             {isHost && p.id !== myPlayer?.id && (
                               <button
@@ -998,28 +1119,36 @@ export default function GameTable({
                         ))}
                       </div>
 
-                      <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">
-                        {gameState.players.length < 4 && (
-                          <button
-                            onClick={handleAddBot}
-                            disabled={isSubmitting}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-400/40 text-[11px] font-bold text-amber-300 transition"
-                          >
-                            <UserPlus className="w-3 h-3" />+ Bot
-                          </button>
-                        )}
+                      {isHost ? (
+                        <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">
+                          {gameState.players.length < 4 && (
+                            <button
+                              onClick={handleAddBot}
+                              disabled={isSubmitting}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-400/40 text-[11px] font-bold text-amber-300 transition"
+                            >
+                              <UserPlus className="w-3 h-3" />+ Bot
+                            </button>
+                          )}
 
-                        <button
-                          onClick={handleStartRound}
-                          disabled={
-                            gameState.players.length < 2 || isSubmitting
-                          }
-                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs shadow-lg transition"
-                        >
-                          <Play className="w-3 h-3 fill-current" />
-                          Mulai
-                        </button>
-                      </div>
+                          <button
+                            onClick={handleStartRound}
+                            disabled={
+                              gameState.players.length < 2 || isSubmitting
+                            }
+                            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs shadow-lg transition"
+                          >
+                            <Play className="w-3 h-3 fill-current" />
+                            Mulai
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="pt-0.5">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-400/30 text-[11px] font-bold text-amber-300">
+                            ⏳ Menunggu pembuat room memulai...
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1111,8 +1240,16 @@ export default function GameTable({
                         {/* Poros Tengah Meja: Status Giliran & Tombol Darurat BOM */}
                         <div className="shrink-0 flex flex-col items-center justify-center text-center space-y-1">
                           {isMyTurn && (
-                            <div className="px-2.5 py-0.5 rounded-full bg-slate-950/90 border border-amber-400/60 text-[10px] font-extrabold text-amber-300 shadow-lg flex items-center gap-1">
-                              <Sparkles className="w-3 h-3" /> GILIRANMU
+                            <div
+                              className={[
+                                "px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold shadow-lg flex items-center gap-1 transition-colors",
+                                turnSecondsLeft <= 5
+                                  ? "bg-rose-950/95 border-rose-400 text-rose-200 animate-pulse"
+                                  : "bg-slate-950/90 border-amber-400/60 text-amber-300",
+                              ].join(" ")}
+                            >
+                              <Sparkles className="w-3 h-3" /> GILIRANMU •{" "}
+                              {turnSecondsLeft}s
                             </div>
                           )}
 
@@ -1211,13 +1348,19 @@ export default function GameTable({
                           ))}
                         </div>
 
-                        <button
-                          onClick={handleStartRound}
-                          disabled={isSubmitting}
-                          className="px-5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg transition"
-                        >
-                          🚀 Main Lagi
-                        </button>
+                        {isHost ? (
+                          <button
+                            onClick={handleStartRound}
+                            disabled={isSubmitting}
+                            className="px-5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg transition"
+                          >
+                            🚀 Main Lagi
+                          </button>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900 border border-amber-400/30 text-[11px] font-bold text-amber-300">
+                            ⏳ Menunggu pembuat room klik Main Lagi...
+                          </div>
+                        )}
                       </div>
                     )}
                 </div>
@@ -1269,17 +1412,20 @@ export default function GameTable({
                 </div>
               )}
 
-              {/* Baris 2: Karakter Kita + Tombol Ejek Lawan (Kiri) | Tombol Aksi (Kanan) */}
+              {/* Baris 2: Karakter Kita + Tombol Ejek & Voice Chat (Kiri) | Tombol Aksi (Kanan) */}
               <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pt-1.5 border-t border-slate-800/80">
-                {/* Kiri: Avatar Karakter Pemain + Tombol Emot Ngejek */}
-                <div className="flex items-center gap-2">
+                {/* Kiri: Avatar Karakter Pemain + Tombol Emot Ngejek + Mic */}
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <PlayerSeat3D
                     player={myPlayer}
                     position="bottom"
                     isCurrentTurn={isMyTurn}
+                    turnSecondsLeft={isMyTurn ? turnSecondsLeft : null}
                     isMe
                     activeTaunt={visibleTaunts[myPlayer.id] || null}
                     onDismissTaunt={handleDismissMyTaunt}
+                    isMicOn={voice.micEnabled}
+                    isSpeaking={Boolean(voice.peerSpeaking[myPlayer.id])}
                   />
 
                   <div className="relative">
@@ -1391,6 +1537,60 @@ export default function GameTable({
                       </div>
                     )}
                   </div>
+
+                  {/* Tombol Voice Chat Mic On/Off */}
+                  <button
+                    type="button"
+                    onClick={voice.toggleMic}
+                    disabled={voice.isConnectingMic}
+                    title={
+                      voice.micEnabled
+                        ? "Matikan Mikrofon (Mute)"
+                        : "Nyalakan Mikrofon untuk Ngobrol"
+                    }
+                    className={[
+                      "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border shadow transition",
+                      voice.micEnabled
+                        ? voice.peerSpeaking[myPlayer.id]
+                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 border-emerald-200 text-slate-950 shadow-[0_0_14px_rgba(16,185,129,0.75)] scale-105"
+                          : "bg-emerald-950/95 hover:bg-emerald-900 border-emerald-400/80 text-emerald-300"
+                        : "bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-300",
+                    ].join(" ")}
+                  >
+                    {voice.isConnectingMic ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                    ) : voice.micEnabled ? (
+                      <Mic className="w-3.5 h-3.5" />
+                    ) : (
+                      <MicOff className="w-3.5 h-3.5 text-rose-400" />
+                    )}
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider">
+                      {voice.micEnabled ? "Mic On" : "Mic"}
+                    </span>
+                  </button>
+
+                  {/* Tombol Speaker Suara Teman */}
+                  <button
+                    type="button"
+                    onClick={voice.toggleSpeaker}
+                    title={
+                      voice.speakerEnabled
+                        ? "Bisukan Suara Obrolan Lawan"
+                        : "Nyalakan Suara Obrolan Lawan"
+                    }
+                    className={[
+                      "p-1.5 rounded-xl border shadow transition",
+                      voice.speakerEnabled
+                        ? "bg-slate-900 hover:bg-slate-800 border-slate-700 text-amber-300"
+                        : "bg-rose-950/90 border-rose-500/60 text-rose-300",
+                    ].join(" ")}
+                  >
+                    {voice.speakerEnabled ? (
+                      <Headphones className="w-3.5 h-3.5" />
+                    ) : (
+                      <VolumeX className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
 
                 {/* Kanan: Tombol Kapsul Aksi (Lewat & Banting Kartu) */}

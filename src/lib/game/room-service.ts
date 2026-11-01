@@ -125,6 +125,7 @@ export async function dispatchGameAction(
     | "submit_threes"
     | "play_cards"
     | "pass_turn"
+    | "timeout_turn"
     | "send_taunt"
     | "forfeit_game",
   currentState?: GameState,

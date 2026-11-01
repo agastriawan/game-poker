@@ -9,6 +9,7 @@ import {
   sendTaunt,
   startNewRound,
   submitPlayerThrees,
+  timeoutTurn,
 } from "@/lib/game/engine";
 import { GameState } from "@/lib/game/types";
 
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
         | "submit_threes"
         | "play_cards"
         | "pass_turn"
+        | "timeout_turn"
         | "send_taunt"
         | "forfeit_game";
       state?: GameState;
@@ -82,7 +84,10 @@ export async function POST(req: NextRequest) {
       case "start_round": {
         if (!state) throw new Error("State room tidak ditemukan.");
         // Pengocokan CSPRNG dieksekusi di Server-Side (Node.js Web Crypto)
-        nextState = startNewRound(state);
+        const requesterId = payload?.playerId
+          ? String(payload.playerId)
+          : undefined;
+        nextState = startNewRound(state, requesterId);
         break;
       }
 
@@ -102,6 +107,12 @@ export async function POST(req: NextRequest) {
       case "pass_turn": {
         if (!state) throw new Error("State room tidak ditemukan.");
         nextState = passTurn(state, String(payload?.playerId));
+        break;
+      }
+
+      case "timeout_turn": {
+        if (!state) throw new Error("State room tidak ditemukan.");
+        nextState = timeoutTurn(state, String(payload?.playerId));
         break;
       }
 

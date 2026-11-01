@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Mic, MicOff } from "lucide-react";
 import { PlayerState, TauntEvent } from "@/lib/game/types";
 
 interface PlayerSeat3DProps {
@@ -11,6 +12,9 @@ interface PlayerSeat3DProps {
   onDismissTaunt?: () => void;
   isMe?: boolean;
   customAvatarIdx?: number;
+  isMicOn?: boolean;
+  isSpeaking?: boolean;
+  turnSecondsLeft?: number | null;
 }
 
 export const CHARACTER_PROFILES = [
@@ -60,6 +64,9 @@ export default function PlayerSeat3D({
   onDismissTaunt,
   isMe = false,
   customAvatarIdx,
+  isMicOn = false,
+  isSpeaking = false,
+  turnSecondsLeft = null,
 }: PlayerSeat3DProps) {
   const profileIdx =
     typeof customAvatarIdx === "number"
@@ -119,9 +126,11 @@ export default function PlayerSeat3D({
 
       {/* AVATAR KARAKTER COMPACT */}
       <div className="relative flex items-center justify-center shrink-0">
-        {isCurrentTurn && (
+        {isSpeaking ? (
+          <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-emerald-400 via-green-300 to-teal-400 opacity-90 blur-sm animate-pulse" />
+        ) : isCurrentTurn ? (
           <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-500 opacity-85 blur-sm animate-pulse" />
-        )}
+        ) : null}
 
         <div
           className={[
@@ -130,7 +139,9 @@ export default function PlayerSeat3D({
               ? "w-10 h-10 sm:w-11 sm:h-11"
               : "w-11 h-11 sm:w-14 sm:h-14",
             charProfile.gradient,
-            isCurrentTurn
+            isSpeaking
+              ? "border-emerald-300 scale-105 ring-2 ring-emerald-400"
+              : isCurrentTurn
               ? "border-amber-300 scale-105 ring-2 ring-amber-400"
               : charProfile.borderGlow,
           ].join(" ")}
@@ -198,14 +209,50 @@ export default function PlayerSeat3D({
           </div>
         )}
 
+        {/* BADGE STATUS MIC (UNTUK PEMAIN MANUSIA) */}
+        {!player.isBot && (
+          <div
+            className={[
+              "absolute -top-1.5 -left-1.5 w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full flex items-center justify-center border shadow",
+              isSpeaking
+                ? "bg-emerald-400 border-white text-slate-950 animate-bounce"
+                : isMicOn
+                ? "bg-emerald-950/95 border-emerald-400 text-emerald-300"
+                : "bg-slate-950/90 border-slate-700 text-slate-500",
+            ].join(" ")}
+            title={
+              isSpeaking
+                ? "Sedang berbicara"
+                : isMicOn
+                ? "Mic Aktif"
+                : "Mic Mati"
+            }
+          >
+            {isMicOn ? (
+              <Mic className="w-2.5 h-2.5" />
+            ) : (
+              <MicOff className="w-2.5 h-2.5" />
+            )}
+          </div>
+        )}
+
         {/* BADGE STATUS */}
         {player.finishRank !== null ? (
           <div className="absolute -top-2 -right-2 px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black text-[9px] shadow border border-white">
             🏆 #{player.finishRank}
           </div>
         ) : isCurrentTurn ? (
-          <div className="absolute -top-2 -right-2 px-2 py-0.2 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 font-black text-[9px] shadow animate-bounce">
-            ⚡ JALAN
+          <div
+            className={[
+              "absolute -top-2 -right-2 px-1.5 py-0.2 rounded-full font-black text-[9px] shadow animate-bounce border",
+              typeof turnSecondsLeft === "number" && turnSecondsLeft <= 5
+                ? "bg-gradient-to-r from-rose-500 to-red-600 text-white border-rose-200"
+                : "bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 border-emerald-100",
+            ].join(" ")}
+          >
+            {typeof turnSecondsLeft === "number"
+              ? `⏱️ ${turnSecondsLeft}s`
+              : "⚡ JALAN"}
           </div>
         ) : player.hasPassedThisTrick ? (
           <div className="absolute -top-2 -right-2 px-1.5 py-0.2 rounded-full bg-slate-900/95 border border-rose-500/60 text-rose-300 font-black text-[9px] uppercase">
