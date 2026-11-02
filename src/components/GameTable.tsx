@@ -1378,7 +1378,9 @@ export default function GameTable({
                 <div
                   className={[
                     "relative w-full rounded-[75px] sm:rounded-[142px] border border-amber-300/40 flex flex-col items-center justify-center px-3 sm:px-10 py-1 sm:py-2 lg:py-3 shadow-inner",
-                    "h-[155px] lg:h-[250px] overflow-hidden",
+                    gameState.phase === "round_end"
+                      ? "h-auto min-h-[140px] sm:min-h-[155px] lg:h-[250px] overflow-visible round-end-felt"
+                      : "h-[155px] lg:h-[250px] overflow-hidden",
                     feltClass,
                   ].join(" ")}
                 >
@@ -1543,10 +1545,10 @@ export default function GameTable({
                   {/* 4. KONTEN MEJA SAAT RONDE SELESAI (ROUND END) */}
                   {gameState.phase === "round_end" &&
                     gameState.roundSummary && (
-                      <div className="relative z-20 w-full max-w-md bg-slate-950/95 border border-amber-400 rounded-2xl p-3 text-center space-y-2 shadow-2xl animate-taunt-pop">
+                      <div className="round-summary-card relative z-30 w-full max-w-xs sm:max-w-md bg-slate-950/95 border-2 border-amber-400 rounded-xl sm:rounded-2xl p-2 sm:p-3 text-center space-y-1 sm:space-y-2 shadow-2xl animate-taunt-pop">
                         {gameState.roundSummary.endReason === "bomb" &&
                         gameState.roundSummary.bombResolution ? (
-                          <div className="space-y-0.5 bg-red-950/70 border border-red-500/50 rounded-xl p-2">
+                          <div className="space-y-0.5 bg-red-950/70 border border-red-500/50 rounded-xl p-1.5 sm:p-2">
                             <div className="text-[10px] font-black text-amber-300 uppercase">
                               💥 BOM MELEDAK!
                             </div>
@@ -1557,24 +1559,24 @@ export default function GameTable({
                             </div>
                           </div>
                         ) : (
-                          <div className="text-xs sm:text-sm font-black text-amber-300 flex items-center justify-center gap-1">
-                            <Crown className="w-3.5 h-3.5 text-amber-400" />{" "}
-                            Juara 1: {gameState.roundSummary.nextStarterName}
+                          <div className="text-[11px] sm:text-sm font-black text-amber-300 flex items-center justify-center gap-1">
+                            <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />{" "}
+                            <span>Juara 1: {gameState.roundSummary.nextStarterName}</span>
                           </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-1 text-[11px]">
+                        <div className="grid grid-cols-2 gap-1 text-[10px] sm:text-[11px]">
                           {gameState.roundSummary.rankings.map((r) => (
                             <div
                               key={r.playerId}
-                              className="flex items-center justify-between px-2 py-1 rounded-lg bg-slate-900 border border-slate-800"
+                              className="flex items-center justify-between px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-slate-900 border border-slate-800"
                             >
-                              <span className="font-bold truncate">
+                              <span className="font-bold truncate max-w-[85px] sm:max-w-none">
                                 {r.playerName}
                               </span>
                               <span
                                 className={[
-                                  "font-mono font-black",
+                                  "font-mono font-black ml-1 shrink-0",
                                   r.scoreDelta > 0
                                     ? "text-emerald-400"
                                     : r.scoreDelta < 0
@@ -1590,12 +1592,12 @@ export default function GameTable({
                           ))}
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 pt-0.5 sm:pt-1">
                           {isHost && (
                             <button
                               onClick={handleStartRound}
                               disabled={isSubmitting}
-                              className="px-5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg transition"
+                              className="px-3.5 sm:px-5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-[11px] sm:text-xs shadow-lg transition active:scale-95"
                             >
                               🚀 Main Lagi
                             </button>
@@ -1604,9 +1606,9 @@ export default function GameTable({
                           <button
                             type="button"
                             onClick={onLeaveRoom}
-                            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-xs shadow transition"
+                            className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-[11px] sm:text-xs shadow transition active:scale-95"
                           >
-                            <Home className="w-3.5 h-3.5" />
+                            <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                             <span>Kembali ke Main Menu</span>
                           </button>
                         </div>

@@ -99,15 +99,34 @@ export default function Model3DAvatar({
 
     // 3. Setup WebGL Renderer
     let renderer: THREE.WebGLRenderer;
+    let onContextLost: ((e: Event) => void) | null = null;
     try {
+      const isMobileDevice =
+        typeof window !== "undefined" &&
+        (window.innerWidth < 768 || window.innerHeight < 520 || navigator.maxTouchPoints > 0);
+
       renderer = new THREE.WebGLRenderer({
         alpha: true,
-        antialias: true,
-        powerPreference: "high-performance",
+        antialias: !isMobileDevice,
+        powerPreference: isMobileDevice ? "default" : "high-performance",
+        precision: isMobileDevice ? "mediump" : "highp",
       });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(
+        isMobileDevice ? 1 : Math.min(window.devicePixelRatio || 1, 2)
+      );
       renderer.setSize(width, height);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.domElement.style.backgroundColor = "transparent";
+
+      onContextLost = (e: Event) => {
+        e.preventDefault();
+        if (!isDisposed) {
+          setHasError(true);
+          setIsLoading(false);
+        }
+      };
+      renderer.domElement.addEventListener("webglcontextlost", onContextLost, false);
+
       container.innerHTML = "";
       container.appendChild(renderer.domElement);
     } catch {
@@ -361,6 +380,16 @@ export default function Model3DAvatar({
           }
         }
       });
+
+      if (onContextLost) {
+        renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
+      }
+
+      try {
+        renderer.forceContextLoss();
+      } catch {
+        // Abaikan jika sudah hilang
+      }
 
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
