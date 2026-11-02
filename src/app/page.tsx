@@ -1,13 +1,16 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   BookOpen,
   Bot,
+  Clock,
   Dices,
   Loader2,
   LogIn,
   Music,
+  Play,
   PlusCircle,
   Users,
   Volume2,
@@ -17,6 +20,10 @@ import GameTable from "@/components/GameTable";
 import PlayingCard from "@/components/PlayingCard";
 import { CHARACTER_PROFILES } from "@/components/PlayerSeat3D";
 import RulesModal from "@/components/RulesModal";
+
+const Model3DAvatar = dynamic(() => import("@/components/Model3DAvatar"), {
+  ssr: false,
+});
 import { soundEngine } from "@/lib/audio/sound-engine";
 import {
   dispatchGameAction,
@@ -69,6 +76,8 @@ export default function HomePage() {
   );
   const [bgmOn, setBgmOn] = useState<boolean>(false);
   const [sfxOn, setSfxOn] = useState<boolean>(true);
+  const [botSetupPlayerCount, setBotSetupPlayerCount] = useState<2 | 3 | 4 | null>(null);
+  const [botTurnLimit, setBotTurnLimit] = useState<number>(20);
 
   const supabaseReady = isSupabaseConfigured();
 
@@ -99,6 +108,22 @@ export default function HomePage() {
       const idx = Number(savedAvatar) % CHARACTER_PROFILES.length;
       setAvatarIdx(idx);
       setCharBubbleText(CHARACTER_PROFILES[idx].quote);
+    }
+
+    // Periksa apakah pemain membuka link undangan (?room=... atau ?join=...)
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteParam = (urlParams.get("room") || urlParams.get("join") || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+    if (inviteParam) {
+      setJoinCodeInput(inviteParam);
+      // Bersihkan parameter dari URL agar rapi
+      window.history.replaceState({}, "", window.location.pathname);
+      const effectiveName =
+        savedName || `Sobat ${storedId.slice(-3).toUpperCase()}`;
+      joinTargetRoom(inviteParam, storedId, effectiveName);
+      return;
     }
 
     // Pulihkan room aktif jika pemain tidak sengaja menekan tombol Refresh
@@ -247,6 +272,46 @@ export default function HomePage() {
     }
   };
 
+  const joinTargetRoom = async (
+    targetCode: string,
+    currentId: string,
+    currentName: string
+  ) => {
+    const code = targetCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!code) return;
+    soundEngine.playCardSlam(false);
+    setLoading(true);
+    setLoadingLabel(`Menghubungkan ke Meja ${code}...`);
+    setErrorMsg(null);
+    try {
+      const existingState = await fetchRoomState(code);
+      if (!existingState) {
+        throw new Error(
+          `Room "${code}" tidak ditemukan. Pastikan kode atau link valid.`
+        );
+      }
+
+      if (existingState.players.some((p) => p.id === currentId)) {
+        setActiveGameState(existingState);
+        return;
+      }
+
+      const nextState = await dispatchGameAction("join_room", existingState, {
+        playerId: currentId,
+        playerName: currentName,
+        isBot: false,
+      });
+      setActiveGameState(nextState);
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal bergabung ke meja."
+      );
+    } finally {
+      setLoading(false);
+      setLoadingLabel(null);
+    }
+  };
+
   // Gabung ke Room yang Sudah Ada
   const handleJoinRoom = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -259,41 +324,14 @@ export default function HomePage() {
     }
 
     const activeId = ensurePlayerId();
-    soundEngine.playCardSlam(false);
-    setLoading(true);
-    setLoadingLabel(`Menghubungkan ke Room ${code}...`);
-    setErrorMsg(null);
-    try {
-      const existingState = await fetchRoomState(code);
-      if (!existingState) {
-        throw new Error(
-          `Room dengan kode "${code}" tidak ditemukan. Pastikan kode benar.`
-        );
-      }
-
-      if (existingState.players.some((p) => p.id === activeId)) {
-        setActiveGameState(existingState);
-        return;
-      }
-
-      const nextState = await dispatchGameAction("join_room", existingState, {
-        playerId: activeId,
-        playerName: cleanName,
-        isBot: false,
-      });
-      setActiveGameState(nextState);
-    } catch (err: unknown) {
-      setErrorMsg(
-        err instanceof Error ? err.message : "Gagal bergabung ke room."
-      );
-    } finally {
-      setLoading(false);
-      setLoadingLabel(null);
-    }
+    await joinTargetRoom(code, activeId, cleanName);
   };
 
   // Main Cepat vs Bot (1-Request Instan di Server!)
-  const handleQuickPlayWithBots = async (totalPlayers: 2 | 3 | 4) => {
+  const handleQuickPlayWithBots = async (
+    totalPlayers: 2 | 3 | 4,
+    turnLimit: number = botTurnLimit
+  ) => {
     if (loading) return;
     const activeId = ensurePlayerId();
     const cleanName = playerName.trim() || "Pemain 1";
@@ -310,6 +348,7 @@ export default function HomePage() {
         hostId: activeId,
         hostName: cleanName,
         totalPlayers,
+        turnDurationLimit: turnLimit,
       });
       setActiveGameState(state);
     } catch (err: unknown) {
@@ -319,6 +358,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
       setLoadingLabel(null);
+      setBotSetupPlayerCount(null);
     }
   };
 
@@ -441,7 +481,7 @@ export default function HomePage() {
                     &ldquo;{charBubbleText}&rdquo;
                   </div>
 
-                  {/* Avatar Karakter Besar Interaktif */}
+                  {/* Showcase Karakter 3D Besar Interaktif (Bebas tanpa kotak) */}
                   <button
                     type="button"
                     onClick={() =>
@@ -449,71 +489,29 @@ export default function HomePage() {
                         (avatarIdx + 1) % CHARACTER_PROFILES.length
                       )
                     }
-                    title="Klik untuk ganti karakter!"
-                    className={[
-                      "relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl overflow-hidden border-2 border-amber-300 shadow-[0_10px_25px_rgba(0,0,0,0.8)] animate-float-char bg-gradient-to-b transition transform hover:scale-105 cursor-pointer",
-                      activeProfile.gradient,
-                    ].join(" ")}
+                    title="Klik untuk ganti karakter 3D!"
+                    className="relative w-56 h-64 sm:w-64 sm:h-76 lg:w-72 lg:h-84 flex items-center justify-center transition transform hover:scale-105 cursor-pointer select-none group"
                   >
-                    <svg viewBox="0 0 100 100" className="w-full h-full">
-                      <circle
-                        cx="50"
-                        cy="45"
-                        r="38"
-                        fill="rgba(255,255,255,0.12)"
+                    {/* Bayangan Halus di Bawah Kaki Karakter (Tanpa Garis Lonjong Kaku) */}
+                    <div className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-32 sm:w-40 h-5 rounded-full bg-black/40 blur-md" />
+
+                    {activeProfile.modelPath ? (
+                      <Model3DAvatar
+                        modelPath={activeProfile.modelPath}
+                        focus="full"
+                        autoRotate={true}
+                        className="w-full h-full"
+                        fallback={
+                          <div className="w-24 h-24 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-bold">
+                            {activeProfile.heroName}
+                          </div>
+                        }
                       />
-                      <path
-                        d="M22 45 C18 75, 25 92, 50 92 C75 92, 82 75, 78 45 Z"
-                        fill={activeProfile.hairColor}
-                        opacity="0.85"
-                      />
-                      <path
-                        d="M20 98 C22 74, 35 68, 50 68 C65 68, 78 74, 80 98 Z"
-                        fill={activeProfile.outfitColor}
-                      />
-                      <polygon points="42,68 50,82 58,68" fill="#ffffff" />
-                      <polygon points="46,74 54,74 50,85" fill="#f59e0b" />
-                      <ellipse
-                        cx="50"
-                        cy="46"
-                        rx="19"
-                        ry="21"
-                        fill="#fde6d8"
-                      />
-                      <ellipse
-                        cx="42"
-                        cy="47"
-                        rx="3.2"
-                        ry="4.2"
-                        fill="#1e1b4b"
-                      />
-                      <ellipse
-                        cx="58"
-                        cy="47"
-                        rx="3.2"
-                        ry="4.2"
-                        fill="#1e1b4b"
-                      />
-                      <circle cx="41" cy="45.5" r="1.2" fill="#ffffff" />
-                      <circle cx="57" cy="45.5" r="1.2" fill="#ffffff" />
-                      <path
-                        d="M46 56 Q50 60 55 56"
-                        stroke="#be123c"
-                        strokeWidth="2"
-                        fill="none"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M29 42 C30 22, 70 22, 71 42 C65 31, 56 36, 50 29 C44 36, 35 31, 29 42 Z"
-                        fill={activeProfile.hairColor}
-                      />
-                      <polygon
-                        points="38,23 44,14 50,20 56,14 62,23"
-                        fill="#fbbf24"
-                        stroke="#78350f"
-                        strokeWidth="1.2"
-                      />
-                    </svg>
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-bold">
+                        {activeProfile.title}
+                      </div>
+                    )}
                   </button>
 
                   {/* Selector 4 Karakter */}
@@ -644,14 +642,17 @@ export default function HomePage() {
                   <Bot className="w-4 h-4" /> Langsung Main vs Bot 3D
                 </span>
                 <span className="text-[10px] font-bold text-slate-400">
-                  1-Klik Langsung Bagi Kartu
+                  Pilih Aturan Giliran & Main
                 </span>
               </div>
 
               <div className="grid grid-cols-3 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => handleQuickPlayWithBots(4)}
+                  onClick={() => {
+                    soundEngine.playCardClick();
+                    setBotSetupPlayerCount(4);
+                  }}
                   disabled={loading}
                   className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-amber-500/15 border border-slate-700 hover:border-amber-400 transition transform hover:-translate-y-0.5"
                 >
@@ -665,7 +666,10 @@ export default function HomePage() {
 
                 <button
                   type="button"
-                  onClick={() => handleQuickPlayWithBots(3)}
+                  onClick={() => {
+                    soundEngine.playCardClick();
+                    setBotSetupPlayerCount(3);
+                  }}
                   disabled={loading}
                   className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-emerald-500/15 border border-slate-700 hover:border-emerald-400 transition transform hover:-translate-y-0.5"
                 >
@@ -679,7 +683,10 @@ export default function HomePage() {
 
                 <button
                   type="button"
-                  onClick={() => handleQuickPlayWithBots(2)}
+                  onClick={() => {
+                    soundEngine.playCardClick();
+                    setBotSetupPlayerCount(2);
+                  }}
                   disabled={loading}
                   className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-sky-500/15 border border-slate-700 hover:border-sky-400 transition transform hover:-translate-y-0.5"
                 >
@@ -713,6 +720,120 @@ export default function HomePage() {
             </div>
             <div className="text-[11px] text-slate-400 font-semibold">
               Mohon tunggu sebentar...
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pilih Aturan Giliran vs Bot */}
+      {botSetupPlayerCount !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
+          onClick={() => setBotSetupPlayerCount(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-slate-950 border-2 border-amber-400 rounded-3xl p-5 shadow-[0_25px_60px_rgba(0,0,0,0.95)] space-y-4 animate-taunt-pop"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-xl">
+                  ⏱️
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                    Aturan Meja vs Bot 3D
+                  </h3>
+                  <p className="text-[11px] text-amber-300 font-bold">
+                    Mode {botSetupPlayerCount} Pemain ({botSetupPlayerCount === 4 ? "13 Kartu / Orang" : botSetupPlayerCount === 3 ? "17–18 Kartu / Orang" : "26 Kartu / Orang"})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBotSetupPlayerCount(null)}
+                className="w-7 h-7 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs font-bold transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Pilih Waktu Giliran Per Orang:</span>
+              </label>
+
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {[
+                  { dur: 20, label: "20s", sub: "Standar" },
+                  { dur: 30, label: "30s", sub: "Santai" },
+                  { dur: 40, label: "40s", sub: "Mikir" },
+                  { dur: 50, label: "50s", sub: "Lama" },
+                  { dur: 60, label: "60s", sub: "Ekstra" },
+                  { dur: 0, label: "∞ Bebas", sub: "Unlimited" },
+                ].map(({ dur, label, sub }) => {
+                  const isSelected = botTurnLimit === dur;
+                  return (
+                    <button
+                      key={dur}
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playCardClick();
+                        setBotTurnLimit(dur);
+                      }}
+                      className={[
+                        "py-2 px-1 rounded-xl transition border text-center flex flex-col items-center justify-center gap-0.5",
+                        isSelected
+                          ? "bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 border-amber-300 shadow-md font-extrabold scale-105"
+                          : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-400/50",
+                      ].join(" ")}
+                    >
+                      <span className="text-xs font-black">{label}</span>
+                      <span className="text-[8px] opacity-80 font-bold">{sub}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
+                {botTurnLimit === 0 ? (
+                  <span className="text-emerald-300 font-semibold">
+                    ⏳ Mode Bebas: Tidak ada batas waktu jalan per giliran. Kamu dan Bot bebas berpikir santai tanpa batas.
+                  </span>
+                ) : (
+                  <span>
+                    ⏱️ Waktu jalan per giliran: <strong className="text-amber-300">{botTurnLimit} detik</strong>. Jika waktu habis, giliran otomatis di-skip.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setBotSetupPlayerCount(null)}
+                className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-black text-slate-300 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickPlayWithBots(botSetupPlayerCount, botTurnLimit)
+                }
+                disabled={loading}
+                className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-xs font-black text-slate-950 shadow-lg transition transform active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Mulai Main</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

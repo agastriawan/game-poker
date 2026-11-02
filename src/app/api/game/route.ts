@@ -10,6 +10,7 @@ import {
   startNewRound,
   submitPlayerThrees,
   timeoutTurn,
+  updateRoomSettings,
 } from "@/lib/game/engine";
 import { GameState } from "@/lib/game/types";
 
@@ -28,7 +29,8 @@ export async function POST(req: NextRequest) {
         | "pass_turn"
         | "timeout_turn"
         | "send_taunt"
-        | "forfeit_game";
+        | "forfeit_game"
+        | "update_room_settings";
       state?: GameState;
       payload?: Record<string, unknown>;
     };
@@ -52,7 +54,14 @@ export async function POST(req: NextRequest) {
           4,
           Math.max(2, Number(payload?.totalPlayers || 4))
         );
+        const turnDurationLimit =
+          payload?.turnDurationLimit !== undefined
+            ? Number(payload.turnDurationLimit)
+            : 20;
+
         let tempState = createInitialGameState({ roomCode, hostId, hostName });
+        tempState = updateRoomSettings(tempState, { turnDurationLimit });
+
         const botNames = ["Bot Himiya", "Bot Riko", "Bot Sari"];
         for (let i = 0; i < totalPlayers - 1; i++) {
           tempState = addPlayerToGame(tempState, {
@@ -131,6 +140,17 @@ export async function POST(req: NextRequest) {
       case "forfeit_game": {
         if (!state) throw new Error("State room tidak ditemukan.");
         nextState = forfeitPlayer(state, String(payload?.playerId));
+        break;
+      }
+
+      case "update_room_settings": {
+        if (!state) throw new Error("State room tidak ditemukan.");
+        nextState = updateRoomSettings(state, {
+          turnDurationLimit:
+            payload?.turnDurationLimit !== undefined
+              ? Number(payload.turnDurationLimit)
+              : undefined,
+        });
         break;
       }
 

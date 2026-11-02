@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * Web Audio API Synthesizer untuk Backsound Kasino (BGM) & Efek Suara (SFX)
- * Tidak membutuhkan file MP3 eksternal sehingga bebas gagal muat (0 latency).
+ * Audio Engine untuk Backsound Kasino (BGM) & Efek Suara (SFX)
+ * - BGM menggunakan file audio MP3 (businessstar-poker-player-392184.mp3)
+ * - SFX menggunakan Web Audio API Synthesizer dengan latensi 0ms.
  */
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private bgmEnabled: boolean = true;
   private sfxEnabled: boolean = true;
-  private bgmInterval: ReturnType<typeof setInterval> | null = null;
-  private bgmStep: number = 0;
+  private bgmAudio: HTMLAudioElement | null = null;
+  private hasInteractionListener: boolean = false;
 
   private ensureContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
@@ -51,120 +52,54 @@ class SoundEngine {
     return this.sfxEnabled;
   }
 
+  private initBgmAudio(): HTMLAudioElement | null {
+    if (typeof window === "undefined") return null;
+    if (!this.bgmAudio) {
+      const audio = new Audio("/audio/bgm-poker.mp3");
+      audio.loop = true;
+      audio.volume = 0.35;
+      audio.preload = "auto";
+      this.bgmAudio = audio;
+    }
+    return this.bgmAudio;
+  }
+
   /**
-   * Memulai Backsound Casino Lounge / Upbeat Groove
+   * Memulai Backsound Musik Poker (businessstar-poker-player-392184.mp3)
    */
   public startBgm(): void {
     if (!this.bgmEnabled || typeof window === "undefined") return;
-    if (this.bgmInterval) return;
 
-    const ctx = this.ensureContext();
-    if (!ctx) return;
+    const audio = this.initBgmAudio();
+    if (!audio) return;
 
-    // Progresi bass & akor jazz kasino (Am7 - Dm7 - G7 - Cmaj7)
-    const bassNotes = [
-      110.0, 110.0, 130.81, 146.83, // A2, A2, C3, D3
-      146.83, 146.83, 164.81, 174.61, // D3, D3, E3, F3
-      98.0, 98.0, 123.47, 146.83, // G2, G2, B2, D3
-      130.81, 130.81, 146.83, 164.81, // C3, C3, D3, E3
-    ];
-
-    const chordVoicings: number[][] = [
-      [220.0, 261.63, 329.63, 392.0], // Am7
-      [293.66, 349.23, 440.0, 523.25], // Dm7
-      [196.0, 246.94, 293.66, 349.23], // G7
-      [261.63, 329.63, 392.0, 493.88], // Cmaj7
-    ];
-
-    this.bgmInterval = setInterval(() => {
-      if (!this.bgmEnabled) return;
-      const audioCtx = this.ensureContext();
-      if (!audioCtx || audioCtx.state !== "running") return;
-
-      const now = audioCtx.currentTime;
-      const step = this.bgmStep % 16;
-
-      // 1. Walking Bassline lembut
-      const bassFreq = bassNotes[step];
-      const bassOsc = audioCtx.createOscillator();
-      const bassGain = audioCtx.createGain();
-      bassOsc.type = "triangle";
-      bassOsc.frequency.setValueAtTime(bassFreq, now);
-
-      bassGain.gain.setValueAtTime(0.05, now);
-      bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
-
-      bassOsc.connect(bassGain);
-      bassGain.connect(audioCtx.destination);
-      bassOsc.start(now);
-      bassOsc.stop(now + 0.34);
-
-      // 2. Warm Lounge Chord pada ketukan ke-0 dan ke-2 tiap bar
-      if (step % 4 === 0 || step % 4 === 2) {
-        const chordIdx = Math.floor(step / 4) % chordVoicings.length;
-        const freqs = chordVoicings[chordIdx];
-        for (const f of freqs) {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(f, now);
-
-          gain.gain.setValueAtTime(0.014, now);
-          gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.45);
-
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now);
-          osc.stop(now + 0.48);
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // Jika autoplay diblokir oleh browser sebelum ada interaksi pengguna
+        if (!this.hasInteractionListener) {
+          this.hasInteractionListener = true;
+          const resumeAudio = () => {
+            if (this.bgmEnabled && this.bgmAudio) {
+              this.bgmAudio.play().catch(() => {});
+            }
+            window.removeEventListener("click", resumeAudio);
+            window.removeEventListener("touchstart", resumeAudio);
+            window.removeEventListener("keydown", resumeAudio);
+            this.hasInteractionListener = false;
+          };
+          window.addEventListener("click", resumeAudio, { once: true });
+          window.addEventListener("touchstart", resumeAudio, { once: true });
+          window.addEventListener("keydown", resumeAudio, { once: true });
         }
-      }
-
-      // 3. Soft Brush Hi-Hat pada ketukan off-beat
-      if (step % 2 === 1) {
-        this.playNoiseTick(audioCtx, now, 0.012, 0.04);
-      }
-
-      this.bgmStep++;
-    }, 360);
+      });
+    }
   }
 
   public stopBgm(): void {
-    if (this.bgmInterval) {
-      clearInterval(this.bgmInterval);
-      this.bgmInterval = null;
+    if (this.bgmAudio) {
+      this.bgmAudio.pause();
     }
-  }
-
-  private playNoiseTick(
-    ctx: AudioContext,
-    startTime: number,
-    volume: number,
-    duration: number
-  ): void {
-    const bufferSize = Math.floor(ctx.sampleRate * duration);
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.setValueAtTime(5000, startTime);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(volume, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
-
-    noise.start(startTime);
-    noise.stop(startTime + duration);
   }
 
   /**

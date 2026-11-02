@@ -17,13 +17,15 @@ body {
     Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
-/* Perspektif Meja Kasino 3D ala Poker Fate */
+/* Perspektif Meja Kasino 3D ala Poker Fate & Interior Kasino Mewah Merah Emas */
 .casino-hall-bg {
-  background:
-    radial-gradient(circle at 50% 15%, rgba(245, 158, 11, 0.16) 0%, transparent 45%),
-    radial-gradient(circle at 18% 25%, rgba(168, 85, 247, 0.14) 0%, transparent 40%),
-    radial-gradient(circle at 82% 25%, rgba(236, 72, 153, 0.12) 0%, transparent 40%),
-    linear-gradient(180deg, #160f29 0%, #0d1b24 48%, #050b11 100%);
+  background-color: #0b0512;
+  background-image:
+    radial-gradient(ellipse at 50% 32%, rgba(11, 5, 18, 0.28) 0%, rgba(8, 3, 13, 0.62) 60%, rgba(4, 1, 7, 0.92) 100%),
+    url('/images/casino-bg.png');
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .perspective-stage {
@@ -147,6 +149,34 @@ body {
 
 .animate-screen-bomb {
   animation: screenBombShake 0.65s ease-in-out;
+}
+
+/* Efek Berkedip Merah Darurat saat Sisa Waktu Giliran <= 10 Detik */
+@keyframes timerCriticalPulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0px rgba(239, 68, 68, 0);
+    opacity: 0;
+  }
+  50% {
+    box-shadow: inset 0 0 70px 15px rgba(239, 68, 68, 0.45);
+    opacity: 1;
+  }
+}
+
+.animate-timer-critical-overlay {
+  animation: timerCriticalPulse 0.9s ease-in-out infinite;
+}
+
+/* Efek Getar Halus agar Pemain Notice saat Sisa Waktu <= 10 Detik */
+@keyframes timerSubtleShake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-2px, 1.5px); }
+  50% { transform: translate(2px, -1.5px); }
+  75% { transform: translate(-1.5px, -1px); }
+}
+
+.animate-timer-subtle-shake {
+  animation: timerSubtleShake 0.35s ease-in-out infinite;
 }
 
 /* Paksa Mode Horizontal (Landscape) Otomatis saat In-Game di Handphone (Portrait) */

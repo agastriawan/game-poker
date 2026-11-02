@@ -11,6 +11,7 @@ import {
   GameState,
   PlayerState,
   RoundSummary,
+  TauntEvent,
 } from "./types";
 
 /**
@@ -34,6 +35,15 @@ export function getNormalScoreByRank(numPlayers: number, rank: number): number {
   // 2 Pemain
   if (rank === 1) return 20;
   return -10;
+}
+
+/**
+ * Filter taunt yang sudah berusia lebih dari 10 detik agar tidak tersimpan terus di state game.
+ */
+export function cleanExpiredTaunt(taunt?: TauntEvent | null): TauntEvent | null {
+  if (!taunt) return null;
+  const elapsed = Date.now() - (taunt.timestamp || 0);
+  return elapsed < 10000 ? taunt : null;
 }
 
 /**
@@ -65,6 +75,7 @@ export function createInitialGameState(params: {
     roundNumber: 0,
     mustCollectThrees: true,
     previousWinnerId: null,
+    turnDurationLimit: 20,
     players: [hostPlayer],
     currentTurnPlayerId: null,
     currentTablePlay: null,
@@ -140,6 +151,32 @@ export function removePlayerFromGame(
     ...state,
     hostId: nextHostId,
     players: filtered,
+    updatedAt: Date.now(),
+  };
+}
+
+/**
+ * Memperbarui pengaturan room (misal batas waktu giliran).
+ */
+export function updateRoomSettings(
+  state: GameState,
+  settings: { turnDurationLimit?: number }
+): GameState {
+  const turnDurationLimit =
+    settings.turnDurationLimit !== undefined
+      ? Number(settings.turnDurationLimit)
+      : state.turnDurationLimit ?? 20;
+
+  const limitText =
+    turnDurationLimit === 0 ? "Unlimited (Tanpa Batas)" : `${turnDurationLimit} detik`;
+
+  return {
+    ...state,
+    turnDurationLimit,
+    logs: [
+      ...(state.logs || []).slice(-19),
+      `Pengaturan waktu giliran diatur ke: ${limitText}.`,
+    ],
     updatedAt: Date.now(),
   };
 }
@@ -224,6 +261,7 @@ export function startNewRound(
       collectedThreesPool: [],
       finishedOrder: [],
       roundSummary: null,
+      latestTaunt: null,
       shuffleMeta: dealResult.shuffleMeta,
       previousHandsSignature: dealResult.newSignatures,
       logs: newLogs,
@@ -251,6 +289,7 @@ export function startNewRound(
       collectedThreesPool: [],
       finishedOrder: [],
       roundSummary: null,
+      latestTaunt: null,
       shuffleMeta: dealResult.shuffleMeta,
       previousHandsSignature: dealResult.newSignatures,
       logs: newLogs,
@@ -567,7 +606,16 @@ export function playCards(
 
   if (remainingHand.length === 0) {
     updatedFinishedOrder.push(playerId);
-    newFinishRank = updatedFinishedOrder.length;
+    const takenRanks = new Set(
+      state.players
+        .map((p) => p.finishRank)
+        .filter((r): r is number => r !== null)
+    );
+    let nextAvailableRank = 1;
+    while (takenRanks.has(nextAvailableRank)) {
+      nextAvailableRank++;
+    }
+    newFinishRank = nextAvailableRank;
     newLogs.push(
       `🎉 ${player.name} mengeluarkan ${combo.label} dan menghabiskan kartu! (Juara #${newFinishRank})`
     );
@@ -592,21 +640,35 @@ export function playCards(
     };
   });
 
-  // Cek apakah permainan sudah selesai (sisa <= 1 pemain yang masih memegang kartu)
-  const stillPlaying = updatedPlayers.filter((p) => p.finishRank === null);
+  // Cek apakah permainan sudah selesai (sisa <= 1 pemain yang masih memegang kartu dan belum forfeit)
+  const stillPlaying = updatedPlayers.filter((p) => p.finishRank === null && !p.isForfeited);
   if (stillPlaying.length <= 1) {
     if (stillPlaying.length === 1) {
       const lastLoser = stillPlaying[0];
+      const usedRanks = new Set(
+        updatedPlayers
+          .map((p) => p.finishRank)
+          .filter((r): r is number => r !== null)
+      );
+      let lastRank = 1;
+      for (let r = 1; r <= updatedPlayers.length; r++) {
+        if (!usedRanks.has(r)) {
+          lastRank = r;
+          break;
+        }
+      }
       updatedFinishedOrder.push(lastLoser.id);
-      const lastRank = updatedFinishedOrder.length;
       updatedPlayers = updatedPlayers.map((p) =>
         p.id === lastLoser.id ? { ...p, finishRank: lastRank } : p
       );
     }
 
-    // Hitung poin akhir ronde normal
+    // Hitung poin akhir ronde normal (pemain yang sudah forfeit tidak dihitung ulang)
     const numPlayers = updatedPlayers.length;
     updatedPlayers = updatedPlayers.map((p) => {
+      if (p.isForfeited) {
+        return p;
+      }
       const rank = p.finishRank || numPlayers;
       const delta = getNormalScoreByRank(numPlayers, rank);
       return {
@@ -632,7 +694,9 @@ export function playCards(
           scoreDelta: p.lastRoundDelta,
           newTotalScore: p.totalScore,
           statusLabel:
-            p.finishRank === 1
+            p.isForfeited
+              ? `🏳️ Keluar / Kalah #${p.finishRank} (-10)`
+              : p.finishRank === 1
               ? "🥇 Juara 1"
               : p.finishRank === numPlayers
               ? "💀 Kalah Terakhir"
@@ -667,7 +731,7 @@ export function playCards(
   // Cari pemain berikutnya
   const nextTurnId = findNextActivePlayerId(updatedPlayers, playerId, true);
 
-  let autoBotTaunt = state.latestTaunt;
+  let autoBotTaunt: TauntEvent | null = null;
   if (player.isBot) {
     if (remainingHand.length === 0) {
       autoBotTaunt = {
@@ -710,7 +774,7 @@ export function playCards(
     trickPile: [...state.trickPile, newPlayEntry],
     roundPlays: [...(state.roundPlays || []), newPlayEntry],
     finishedOrder: updatedFinishedOrder,
-    latestTaunt: autoBotTaunt,
+    latestTaunt: autoBotTaunt || cleanExpiredTaunt(state.latestTaunt),
     logs: newLogs,
     updatedAt: Date.now(),
   };
@@ -788,6 +852,7 @@ export function passTurn(state: GameState, playerId: string): GameState {
       currentTurnPlayerId: nextLeaderId,
       currentTablePlay: null,
       trickPile: [],
+      latestTaunt: cleanExpiredTaunt(state.latestTaunt),
       logs: newLogs,
       updatedAt: Date.now(),
     };
@@ -828,6 +893,7 @@ export function passTurn(state: GameState, playerId: string): GameState {
         currentTurnPlayerId: nextLeaderId,
         currentTablePlay: null,
         trickPile: [],
+        latestTaunt: cleanExpiredTaunt(state.latestTaunt),
         logs: newLogs,
         updatedAt: Date.now(),
       };
@@ -838,6 +904,7 @@ export function passTurn(state: GameState, playerId: string): GameState {
     ...state,
     players: updatedPlayers,
     currentTurnPlayerId: nextTurnId,
+    latestTaunt: cleanExpiredTaunt(state.latestTaunt),
     logs: newLogs,
     updatedAt: Date.now(),
   };
@@ -876,6 +943,7 @@ export function timeoutTurn(state: GameState, playerId: string): GameState {
     currentTurnPlayerId: nextLeaderId,
     currentTablePlay: null,
     trickPile: [],
+    latestTaunt: cleanExpiredTaunt(state.latestTaunt),
     logs: [
       ...state.logs.slice(-18),
       `⏰ Waktu 20 detik habis! Giliran ${player.name} otomatis di-skip ke ${nextLeaderName}.`,
@@ -912,37 +980,47 @@ export function sendTaunt(
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return state;
 
+  const isEmojiOnly = tauntId === "emoji_only";
   const trimmedCustom = customText ? customText.trim().slice(0, 60) : "";
   const preset =
     TAUNT_PRESETS.find((t) => t.id === tauntId) || TAUNT_PRESETS[0];
 
-  const finalEmoji = trimmedCustom ? customEmoji || "😈" : preset.emoji;
-  const finalText = trimmedCustom || preset.text;
+  const finalEmoji = isEmojiOnly
+    ? customEmoji || "😈"
+    : trimmedCustom
+    ? customEmoji || "😈"
+    : preset.emoji;
+  const finalText = isEmojiOnly ? "" : trimmedCustom || preset.text;
 
   const tauntEvent = {
     id: `taunt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     senderId: player.id,
     senderName: player.name,
-    tauntId: trimmedCustom ? "custom" : preset.id,
+    tauntId: isEmojiOnly ? "emoji_only" : trimmedCustom ? "custom" : preset.id,
     emoji: finalEmoji,
     text: finalText,
     timestamp: Date.now(),
   };
+
+  const logMessage = isEmojiOnly
+    ? `${finalEmoji} ${player.name} mengirim emot!`
+    : `${finalEmoji} ${player.name}: "${finalText}"`;
 
   return {
     ...state,
     latestTaunt: tauntEvent,
     logs: [
       ...state.logs.slice(-18),
-      `${finalEmoji} ${player.name}: "${finalText}"`,
+      logMessage,
     ],
     updatedAt: Date.now(),
   };
 }
 
 /**
- * Jika pemain memilih keluar saat permainan sedang berlangsung,
- * pemain tersebut otomatis dinyatakan KALAH (-10 poin) dan ronde berakhir.
+ * Jika pemain memilih keluar saat permainan sedang berlangsung:
+ * - Pemain tersebut langsung dinyatakan KALAH di posisi terbawah yang tersisa (#4, #3, dst.) dengan penalti -10 pts.
+ * - Permainan TETAP BERLANJUT untuk pemain lainnya sampai tersisa 1 orang saja.
  */
 export function forfeitPlayer(state: GameState, playerId: string): GameState {
   const player = state.players.find((p) => p.id === playerId);
@@ -952,81 +1030,208 @@ export function forfeitPlayer(state: GameState, playerId: string): GameState {
     return removePlayerFromGame(state, playerId);
   }
 
+  // Jika pemain sudah selesai atau sudah forfeit sebelumnya, abaikan
+  if (player.finishRank !== null || player.isForfeited) {
+    return state;
+  }
+
   const numPlayers = state.players.length;
 
-  // Urutkan pemain selain yang menyerah berdasarkan yang sudah selesai lebih dulu, lalu sisa kartu paling sedikit
-  const otherPlayers = state.players
-    .filter((p) => p.id !== playerId)
-    .sort((a, b) => {
-      if (a.finishRank !== null && b.finishRank !== null) {
-        return a.finishRank - b.finishRank;
+  // Cari seluruh rank yang sudah terpakai
+  const takenRanks = new Set(
+    state.players
+      .map((p) => p.finishRank)
+      .filter((r): r is number => r !== null)
+  );
+
+  // Pemain yang keluar mendapatkan posisi rank paling bawah yang belum terpakai (N, N-1, dst.)
+  let assignedRank = numPlayers;
+  while (assignedRank > 1 && takenRanks.has(assignedRank)) {
+    assignedRank--;
+  }
+
+  const forfeitDelta = -10;
+  let updatedPlayers = state.players.map((p) => {
+    if (p.id === playerId) {
+      return {
+        ...p,
+        hand: [],
+        finishRank: assignedRank,
+        lastRoundDelta: forfeitDelta,
+        totalScore: p.totalScore + forfeitDelta,
+        isForfeited: true,
+        hasPassedThisTrick: true,
+        hasSubmittedThrees: true,
+      };
+    }
+    return p;
+  });
+
+  const newLogs = [
+    ...state.logs.slice(-18),
+    `🏳️ ${player.name} keluar dari permainan (Dinyatakan KALAH di posisi #${assignedRank}, -10 pts).`,
+  ];
+
+  // Periksa sisa pemain yang masih aktif bermain
+  const stillPlaying = updatedPlayers.filter(
+    (p) => p.finishRank === null && !p.isForfeited
+  );
+
+  // KASUS 1: Hanya tersisa <= 1 pemain aktif -> Ronde Selesai!
+  if (stillPlaying.length <= 1) {
+    if (stillPlaying.length === 1) {
+      const lastSurvivor = stillPlaying[0];
+      const usedRanks = new Set(
+        updatedPlayers
+          .map((p) => p.finishRank)
+          .filter((r): r is number => r !== null)
+      );
+      let lastUntakenRank = 1;
+      for (let r = 1; r <= numPlayers; r++) {
+        if (!usedRanks.has(r)) {
+          lastUntakenRank = r;
+          break;
+        }
       }
-      if (a.finishRank !== null) return -1;
-      if (b.finishRank !== null) return 1;
-      return a.hand.length - b.hand.length;
-    });
 
-  const rankMap = new Map<string, number>();
-  otherPlayers.forEach((p, idx) => {
-    rankMap.set(p.id, idx + 1);
-  });
-  rankMap.set(playerId, numPlayers);
+      const survivorDelta = getNormalScoreByRank(numPlayers, lastUntakenRank);
+      updatedPlayers = updatedPlayers.map((p) => {
+        if (p.id === lastSurvivor.id) {
+          return {
+            ...p,
+            finishRank: lastUntakenRank,
+            lastRoundDelta: survivorDelta,
+            totalScore: p.totalScore + survivorDelta,
+          };
+        }
+        return p;
+      });
+    }
 
-  const updatedPlayers = state.players.map((p) => {
-    const rank = rankMap.get(p.id) || numPlayers;
-    const delta =
-      p.id === playerId ? -10 : getNormalScoreByRank(numPlayers, rank);
-    return {
-      ...p,
-      finishRank: rank,
-      lastRoundDelta: delta,
-      totalScore: p.totalScore + delta,
-    };
-  });
+    const sortedByRank = [...updatedPlayers].sort(
+      (a, b) => (a.finishRank || 99) - (b.finishRank || 99)
+    );
+    const firstWinner = sortedByRank.find((p) => !p.isForfeited) || sortedByRank[0];
 
-  const firstWinner = otherPlayers[0];
-  const firstWinnerId = firstWinner ? firstWinner.id : null;
-  const firstWinnerName = firstWinner ? firstWinner.name : "Pemain";
-
-  const roundSummary: RoundSummary = {
-    roundNumber: state.roundNumber,
-    endReason: "normal",
-    rankings: [...updatedPlayers]
-      .sort((a, b) => (a.finishRank || 99) - (b.finishRank || 99))
-      .map((p) => ({
+    const roundSummary: RoundSummary = {
+      roundNumber: state.roundNumber,
+      endReason: "normal",
+      rankings: sortedByRank.map((p) => ({
         playerId: p.id,
         playerName: p.name,
         rank: p.finishRank,
         scoreDelta: p.lastRoundDelta,
         newTotalScore: p.totalScore,
         statusLabel:
-          p.id === playerId
-            ? "🏳️ Keluar / Kalah (-10)"
+          p.isForfeited
+            ? `🏳️ Keluar / Kalah #${p.finishRank} (-10)`
             : p.finishRank === 1
             ? "🥇 Juara 1"
+            : p.finishRank === numPlayers
+            ? "💀 Kalah Terakhir"
             : `🏅 Juara ${p.finishRank}`,
       })),
-    nextRoundMode: "collect_threes",
-    nextStarterId: firstWinnerId,
-    nextStarterName: firstWinnerName,
-  };
+      nextRoundMode: "collect_threes",
+      nextStarterId: firstWinner ? firstWinner.id : null,
+      nextStarterName: firstWinner ? firstWinner.name : null,
+    };
+
+    return {
+      ...state,
+      phase: "round_end",
+      mustCollectThrees: true,
+      previousWinnerId: null,
+      players: updatedPlayers,
+      currentTurnPlayerId: null,
+      roundSummary,
+      logs: newLogs,
+      updatedAt: Date.now(),
+    };
+  }
+
+  // KASUS 2: Masih ada 2 pemain atau lebih yang bermain -> PERMAINAN TETAP BERLANJUT!
+  const nextHostId =
+    state.hostId === playerId
+      ? stillPlaying.find((p) => !p.isBot)?.id || stillPlaying[0].id
+      : state.hostId;
+
+  // Jika saat ini fase collecting_threes
+  if (state.phase === "collecting_threes") {
+    const allSubmitted = updatedPlayers.every((p) => p.hasSubmittedThrees);
+    if (!allSubmitted) {
+      return {
+        ...state,
+        hostId: nextHostId,
+        players: updatedPlayers,
+        logs: newLogs,
+        updatedAt: Date.now(),
+      };
+    }
+
+    // Jika semua yang tersisa sudah submit threes, mulai fase playing!
+    const threeSpadesEntry = state.collectedThreesPool.find(
+      (e) => e.hasThreeOfSpades
+    );
+    const firstPlayerId =
+      threeSpadesEntry &&
+      updatedPlayers.some((p) => p.id === threeSpadesEntry.playerId && !p.isForfeited)
+        ? threeSpadesEntry.playerId
+        : stillPlaying[0].id;
+    const firstPlayerName =
+      updatedPlayers.find((p) => p.id === firstPlayerId)?.name || "Pemain";
+
+    newLogs.push(`♠️ ${firstPlayerName} berhak jalan paling awal!`);
+
+    return {
+      ...state,
+      phase: "playing",
+      hostId: nextHostId,
+      players: updatedPlayers,
+      currentTurnPlayerId: firstPlayerId,
+      currentTablePlay: null,
+      trickPile: [],
+      logs: newLogs,
+      updatedAt: Date.now(),
+    };
+  }
+
+  // Jika saat ini fase playing:
+  // Oper giliran jika pemain yang keluar sedang memegang giliran jalan
+  let nextTurnId = state.currentTurnPlayerId;
+  let nextTablePlay = state.currentTablePlay;
+  let nextTrickPile = state.trickPile;
+  let finalPlayers = updatedPlayers;
+
+  if (state.currentTurnPlayerId === playerId) {
+    let candidateTurnId = findNextActivePlayerId(
+      updatedPlayers,
+      player.id,
+      state.currentTablePlay ? false : true
+    );
+
+    if (!candidateTurnId) {
+      // Seluruh pemain aktif lainnya sudah pass pada trick ini
+      finalPlayers = updatedPlayers.map((p) => ({
+        ...p,
+        hasPassedThisTrick: false,
+      }));
+      candidateTurnId = findNextActivePlayerId(finalPlayers, player.id, true);
+      nextTablePlay = null;
+      nextTrickPile = [];
+      newLogs.push("✨ Meja dikosongkan — giliran bebas untuk pemain berikutnya.");
+    }
+
+    nextTurnId = candidateTurnId;
+  }
 
   return {
     ...state,
-    phase: "round_end",
-    mustCollectThrees: true,
-    previousWinnerId: null,
-    players: updatedPlayers,
-    currentTurnPlayerId: null,
-    finishedOrder: [
-      ...otherPlayers.map((p) => p.id),
-      playerId,
-    ],
-    roundSummary,
-    logs: [
-      ...state.logs.slice(-18),
-      `🏳️ ${player.name} keluar dari permainan dan dinyatakan KALAH (-10 pts)!`,
-    ],
+    hostId: nextHostId,
+    players: finalPlayers,
+    currentTurnPlayerId: nextTurnId,
+    currentTablePlay: nextTablePlay,
+    trickPile: nextTrickPile,
+    logs: newLogs,
     updatedAt: Date.now(),
   };
 }

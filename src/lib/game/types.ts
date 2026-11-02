@@ -89,6 +89,8 @@ export interface PlayerState {
   hasPassedThisTrick: boolean;
   /** Urutan selesai (1 = Juara 1, 2 = Juara 2, dst. null jika belum habis) */
   finishRank: number | null;
+  /** Apakah pemain menyerah / keluar di tengah permainan */
+  isForfeited?: boolean;
   /** Total poin akumulasi dari seluruh ronde */
   totalScore: number;
   /** Perubahan poin pada ronde terakhir */
@@ -161,6 +163,8 @@ export interface GameState {
   mustCollectThrees: boolean;
   /** ID Juara 1 dari ronde normal sebelumnya (jika ada) */
   previousWinnerId: string | null;
+  /** Batas waktu giliran per orang dalam detik (20, 30, 40, 50, 60, atau 0 = unlimited) */
+  turnDurationLimit?: number;
   players: PlayerState[];
   /** ID pemain yang sedang mendapat giliran jalan */
   currentTurnPlayerId: string | null;

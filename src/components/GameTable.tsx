@@ -4,10 +4,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import {
   Check,
+  Clock,
   Copy,
   Crown,
   Flame,
   Headphones,
+  Home,
+  Link2,
   Loader2,
   LogOut,
   MessageSquareMore,
@@ -18,6 +21,7 @@ import {
   Play,
   RotateCcw,
   Settings,
+  Share2,
   ShieldCheck,
   SkipForward,
   Sparkles,
@@ -44,7 +48,7 @@ import {
 import { dispatchGameAction } from "@/lib/game/room-service";
 import { useVoiceChat } from "@/lib/game/useVoiceChat";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { GameState, PlayerState, TauntEvent } from "@/lib/game/types";
+import { GameState, PlayedCombo, PlayerState, TauntEvent } from "@/lib/game/types";
 
 function PlayerTableSlot({
   player,
@@ -108,6 +112,26 @@ function PlayerTableSlot({
   );
 }
 
+function getComboDisplayLabel(combo: PlayedCombo | null): string {
+  if (!combo) return "";
+  switch (combo.type) {
+    case "single":
+      return "Single";
+    case "double":
+      return "Double";
+    case "triple":
+      return "Triple";
+    case "straight_flush":
+      return `Seri (${combo.length})`;
+    case "full_house":
+      return "Full House";
+    case "four_of_a_kind":
+      return "BOM";
+    default:
+      return "Kartu";
+  }
+}
+
 interface GameTableProps {
   gameState: GameState;
   myPlayerId: string;
@@ -129,6 +153,7 @@ export default function GameTable({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [isTauntMenuOpen, setIsTauntMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -142,7 +167,7 @@ export default function GameTable({
   const [customTauntText, setCustomTauntText] = useState<string>("");
   const [customTauntEmoji, setCustomTauntEmoji] = useState<string>("😈");
   const [isBombShaking, setIsBombShaking] = useState<boolean>(false);
-  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number>(20);
+  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number | null>(20);
 
   const lastPlayedTimestampRef = useRef<number>(0);
   const lastTauntIdRef = useRef<string>("");
@@ -228,11 +253,18 @@ export default function GameTable({
     gameStateRef.current = gameState;
   }, [gameState]);
 
-  // Batas waktu giliran 20 detik per orang -> jika tidak jalan otomatis Auto-Skip
+  // Batas waktu giliran per orang (20/30/40/50/60 atau 0 = Unlimited) -> Auto-Skip jika habis
   useEffect(() => {
     const current = gameStateRef.current;
     if (current.phase !== "playing" || !current.currentTurnPlayerId) {
-      setTurnSecondsLeft(20);
+      setTurnSecondsLeft(null);
+      return;
+    }
+
+    const limit = current.turnDurationLimit ?? 20;
+    // Jika limit === 0, berarti mode Unlimited / Tanpa Batas Waktu
+    if (limit === 0) {
+      setTurnSecondsLeft(null);
       return;
     }
 
@@ -240,22 +272,22 @@ export default function GameTable({
       (p) => p.id === current.currentTurnPlayerId
     );
     if (!activePlayer || activePlayer.isBot) {
-      setTurnSecondsLeft(20);
+      setTurnSecondsLeft(limit);
       return;
     }
 
-    setTurnSecondsLeft(20);
+    setTurnSecondsLeft(limit);
     const turnStartedAt = Date.now();
     let hasTriggeredTimeout = false;
 
     const interval = setInterval(async () => {
       const elapsedSec = Math.floor((Date.now() - turnStartedAt) / 1000);
-      const remaining = Math.max(0, 20 - elapsedSec);
+      const remaining = Math.max(0, limit - elapsedSec);
       setTurnSecondsLeft(remaining);
 
       const shouldTriggerNow =
-        (isMyTurn && elapsedSec >= 20) ||
-        (!isMyTurn && isHost && elapsedSec >= 21);
+        (isMyTurn && elapsedSec >= limit) ||
+        (!isMyTurn && isHost && elapsedSec >= limit + 1);
 
       if (shouldTriggerNow && !hasTriggeredTimeout) {
         hasTriggeredTimeout = true;
@@ -282,11 +314,31 @@ export default function GameTable({
     gameState.phase,
     gameState.roundNumber,
     gameState.currentTurnPlayerId,
+    gameState.turnDurationLimit,
     gameState.trickPile.length,
     isHost,
     isMyTurn,
     onStateChange,
   ]);
+
+  // Efek Getar Haptic saat waktu tersisa <= 10 detik di giliran pemain sendiri
+  useEffect(() => {
+    if (
+      isMyTurn &&
+      gameState.phase === "playing" &&
+      turnSecondsLeft !== null &&
+      turnSecondsLeft > 0 &&
+      (turnSecondsLeft === 10 || turnSecondsLeft === 5 || turnSecondsLeft === 3)
+    ) {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          navigator.vibrate([100, 50, 100]);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [isMyTurn, gameState.phase, turnSecondsLeft]);
 
   // Deteksi kartu baru dibanting ke meja -> bunyikan SFX banting kartu
   useEffect(() => {
@@ -307,27 +359,54 @@ export default function GameTable({
     const taunt = gameState.latestTaunt;
     if (taunt && taunt.id !== lastTauntIdRef.current) {
       lastTauntIdRef.current = taunt.id;
-      soundEngine.playTauntSound(taunt.tauntId);
 
-      setVisibleTaunts((prev) => ({
-        ...prev,
-        [taunt.senderId]: taunt,
-      }));
+      // Hanya tampilkan jika taunt masih baru (< 10 detik lalu)
+      const elapsed = Date.now() - (taunt.timestamp || 0);
+      if (elapsed < 10000) {
+        soundEngine.playTauntSound(taunt.tauntId);
 
-      if (tauntTimersRef.current[taunt.senderId]) {
-        clearTimeout(tauntTimersRef.current[taunt.senderId]);
+        setVisibleTaunts((prev) => ({
+          ...prev,
+          [taunt.senderId]: taunt,
+        }));
+
+        if (tauntTimersRef.current[taunt.senderId]) {
+          clearTimeout(tauntTimersRef.current[taunt.senderId]);
+        }
+
+        const remainingMs = Math.max(500, 10000 - elapsed);
+        tauntTimersRef.current[taunt.senderId] = setTimeout(() => {
+          setVisibleTaunts((prev) => {
+            if (prev[taunt.senderId]?.id !== taunt.id) return prev;
+            const copy = { ...prev };
+            delete copy[taunt.senderId];
+            return copy;
+          });
+        }, remainingMs);
       }
-
-      tauntTimersRef.current[taunt.senderId] = setTimeout(() => {
-        setVisibleTaunts((prev) => {
-          if (prev[taunt.senderId]?.id !== taunt.id) return prev;
-          const copy = { ...prev };
-          delete copy[taunt.senderId];
-          return copy;
-        });
-      }, 10000);
     }
   }, [gameState.latestTaunt]);
+
+  // Sweeper Interval: bersihkan otomatis semua chat/emot setelah 10 detik secara presisi
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setVisibleTaunts((prev) => {
+        let changed = false;
+        const next: Record<string, TauntEvent> = {};
+        for (const [senderId, t] of Object.entries(prev)) {
+          if (now - (t.timestamp || 0) < 10000) {
+            next[senderId] = t;
+          } else {
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const timers = tauntTimersRef.current;
@@ -517,6 +596,37 @@ export default function GameTable({
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
+  const getInviteUrl = () => {
+    if (typeof window === "undefined") {
+      return `https://poker-barudak.vercel.app/?room=${gameState.roomCode}`;
+    }
+    return `${window.location.origin}/?room=${gameState.roomCode}`;
+  };
+
+  const handleCopyRoomLink = () => {
+    const url = getInviteUrl();
+    navigator.clipboard.writeText(url);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleShareInvite = async () => {
+    const url = getInviteUrl();
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "Poker Barudak",
+          text: `Ayo mabar Poker Barudak! Klik link untuk langsung gabung ke meja:`,
+          url,
+        });
+      } catch {
+        handleCopyRoomLink();
+      }
+    } else {
+      handleCopyRoomLink();
+    }
+  };
+
   const handleSendTaunt = async (
     tauntId: string,
     customText?: string,
@@ -582,6 +692,24 @@ export default function GameTable({
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateTurnLimit = async (limit: number) => {
+    if (!isHost || isSubmitting) return;
+    try {
+      const next = await dispatchGameAction(
+        "update_room_settings",
+        gameState,
+        { turnDurationLimit: limit }
+      );
+      onStateChange(next);
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : "Gagal memperbarui batas waktu giliran."
+      );
     }
   };
 
@@ -684,16 +812,18 @@ export default function GameTable({
         (gameState.phase === "collecting_threes" ||
           gameState.phase === "playing")
       ) {
-        await dispatchGameAction("forfeit_game", gameState, {
+        const next = await dispatchGameAction("forfeit_game", gameState, {
           playerId: myPlayer.id,
         });
+        onStateChange(next);
+      } else {
+        onLeaveRoom();
       }
     } catch {
-      // ignore
+      onLeaveRoom();
     } finally {
       setIsSubmitting(false);
       setIsLeaveConfirmOpen(false);
-      onLeaveRoom();
     }
   };
 
@@ -745,12 +875,8 @@ export default function GameTable({
         isBombShaking ? "animate-screen-bomb" : "",
       ].join(" ")}
     >
-      {/* DEKORASI RUANGAN GRAND CASINO LOUNGE */}
+      {/* DEKORASI CAHAYA RUANGAN GRAND CASINO LOUNGE */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-8 w-20 h-36 bg-gradient-to-b from-amber-500/10 via-stone-800/20 to-transparent border-x border-amber-500/15 blur-[1px]" />
-        <div className="absolute top-0 right-8 w-20 h-36 bg-gradient-to-b from-amber-500/10 via-stone-800/20 to-transparent border-x border-amber-500/15 blur-[1px]" />
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-40 rounded-full bg-amber-500/15 blur-3xl" />
-
         {/* Partikel Cahaya Emas Mengambang */}
         <div className="absolute top-1/4 left-1/5 w-1.5 h-1.5 rounded-full bg-amber-300 animate-ambient-particle" />
         <div
@@ -762,6 +888,17 @@ export default function GameTable({
           style={{ animationDelay: "2.4s" }}
         />
       </div>
+
+      {/* ================================================================= */}
+      {/* EFEK LAYAR BERKEDIP MERAH & GETAR SAAT SISA WAKTU <= 10 DETIK    */}
+      {/* ================================================================= */}
+      {isMyTurn &&
+        gameState.phase === "playing" &&
+        turnSecondsLeft !== null &&
+        turnSecondsLeft <= 10 &&
+        turnSecondsLeft > 0 && (
+          <div className="pointer-events-none fixed inset-0 z-50 animate-timer-critical-overlay border-4 border-rose-500/60" />
+        )}
 
       {/* ================================================================= */}
       {/* FLOATING SINGLE SETTINGS BUTTON (PENGGANTI NAVBAR)                */}
@@ -985,12 +1122,13 @@ export default function GameTable({
       <main className="relative z-10 flex-1 min-h-0 flex flex-col justify-between max-w-7xl w-full mx-auto px-2 sm:px-6 py-1 lg:py-1.5">
         {/* ZONA ATAS & TENGAH: KURSI LAWAN (KIRI, ATAS, KANAN) + MEJA OVAL 3D */}
         <div className="relative flex-1 min-h-0 flex flex-col items-center justify-center w-full">
-          {/* KURSI LAWAN ATAS */}
-          <div className="flex justify-center items-center shrink-0 -mb-2 z-20 scale-90 lg:scale-100">
+          {/* KURSI LAWAN ATAS (KARAKTER 3D BESAR BERADA DI BELAKANG MEJA) */}
+          <div className="flex justify-center items-center shrink-0 pt-1 sm:pt-2 -mb-5 sm:-mb-7 lg:-mb-8 z-20">
             {seatAssignments.top ? (
               <PlayerSeat3D
                 player={seatAssignments.top}
                 position="top"
+                isHost={gameState.hostId === seatAssignments.top.id}
                 isCurrentTurn={
                   gameState.phase === "playing" &&
                   gameState.currentTurnPlayerId === seatAssignments.top.id
@@ -1010,12 +1148,13 @@ export default function GameTable({
 
           {/* CONTAINER MEJA 3D + KURSI KIRI & KANAN */}
           <div className="relative w-full flex items-center justify-center">
-            {/* KURSI LAWAN KIRI */}
+            {/* KURSI LAWAN KIRI (POSISI LEBIH KE ATAS AGAR NAMA, POIN & KARTU TIDAK TERPOTONG) */}
             {seatAssignments.left && (
-              <div className="flex absolute left-0.5 lg:left-3 top-1/2 -translate-y-1/2 z-20 scale-90 lg:scale-100">
+              <div className="flex absolute left-0 sm:left-1 lg:left-4 top-[30%] sm:top-[32%] -translate-y-1/2 z-20">
                 <PlayerSeat3D
                   player={seatAssignments.left}
                   position="left"
+                  isHost={gameState.hostId === seatAssignments.left.id}
                   isCurrentTurn={
                     gameState.phase === "playing" &&
                     gameState.currentTurnPlayerId === seatAssignments.left.id
@@ -1035,12 +1174,13 @@ export default function GameTable({
               </div>
             )}
 
-            {/* KURSI LAWAN KANAN */}
+            {/* KURSI LAWAN KANAN (POSISI LEBIH KE ATAS AGAR NAMA, POIN & KARTU TIDAK TERPOTONG) */}
             {seatAssignments.right && (
-              <div className="flex absolute right-0.5 lg:right-3 top-1/2 -translate-y-1/2 z-20 scale-90 lg:scale-100">
+              <div className="flex absolute right-0 sm:right-1 lg:right-4 top-[30%] sm:top-[32%] -translate-y-1/2 z-20">
                 <PlayerSeat3D
                   player={seatAssignments.right}
                   position="right"
+                  isHost={gameState.hostId === seatAssignments.right.id}
                   isCurrentTurn={
                     gameState.phase === "playing" &&
                     gameState.currentTurnPlayerId === seatAssignments.right.id
@@ -1085,9 +1225,65 @@ export default function GameTable({
 
                   {/* 1. KONTEN MEJA SAAT WAITING (LOBBY MEJA) */}
                   {gameState.phase === "waiting" && (
-                    <div className="relative z-10 w-full max-w-md bg-slate-950/90 border border-amber-400/40 rounded-2xl p-3 sm:p-4 text-center space-y-2.5 shadow-2xl">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-bold">
-                        <Users className="w-3 h-3" /> {gameState.players.length}/4 Pemain
+                    <div className="relative z-10 w-full max-w-md bg-slate-950/95 border border-amber-400/50 rounded-2xl p-2.5 sm:p-3.5 text-center space-y-2 shadow-2xl">
+                      {/* Baris Kode Room & Tombol Salin / Undang */}
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 bg-slate-900/90 border border-amber-400/40 px-2.5 py-1.5 rounded-xl">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-slate-400 font-semibold">Room:</span>
+                          <span className="font-mono font-black text-amber-300 tracking-wider text-sm select-all">
+                            {gameState.roomCode}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 ml-auto">
+                          <button
+                            type="button"
+                            onClick={handleCopyRoomCode}
+                            title="Salin Kode Room Saja"
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-amber-400/30 text-amber-300 text-[10px] font-bold transition"
+                          >
+                            {copiedCode ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span className="text-emerald-300">Tersalin</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Salin Kode</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleShareInvite}
+                            title="Salin Link Meja (Teman klik langsung gabung)"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-[10px] shadow transition"
+                          >
+                            {copiedLink ? (
+                              <>
+                                <Check className="w-3 h-3 text-white" />
+                                <span className="text-white">Link Tersalin!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Link2 className="w-3 h-3" />
+                                <span>Salin Link</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Header Pemain */}
+                      <div className="flex items-center justify-between px-1 text-[11px] text-slate-300">
+                        <div className="inline-flex items-center gap-1 font-bold text-amber-300">
+                          <Users className="w-3 h-3" /> {gameState.players.length}/4 Pemain
+                        </div>
+                        <span className="text-[10px] text-emerald-400 font-medium">
+                          🔗 Teman klik link otomatis masuk
+                        </span>
                       </div>
 
                       <div className="grid grid-cols-2 gap-1.5 text-left">
@@ -1117,6 +1313,52 @@ export default function GameTable({
                             )}
                           </div>
                         ))}
+                      </div>
+
+                      {/* Pengaturan Batas Waktu Giliran (20s, 30s, 40s, 50s, 60s, Unlimited) */}
+                      <div className="bg-slate-900/90 border border-amber-400/30 rounded-xl p-2 text-left space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="flex items-center gap-1.5 font-bold text-amber-300">
+                            <Clock className="w-3.5 h-3.5" /> Waktu Giliran:
+                          </span>
+                          <span className="font-mono font-extrabold text-amber-200 text-xs">
+                            {(gameState.turnDurationLimit ?? 20) === 0
+                              ? "∞ Unlimited (Bebas)"
+                              : `${gameState.turnDurationLimit ?? 20} Detik`}
+                          </span>
+                        </div>
+
+                        {isHost ? (
+                          <div className="grid grid-cols-6 gap-1">
+                            {[20, 30, 40, 50, 60, 0].map((dur) => {
+                              const isSelected =
+                                (gameState.turnDurationLimit ?? 20) === dur;
+                              return (
+                                <button
+                                  key={dur}
+                                  type="button"
+                                  disabled={isSubmitting}
+                                  onClick={() => handleUpdateTurnLimit(dur)}
+                                  className={[
+                                    "py-1 rounded-lg text-[10px] font-black transition border text-center",
+                                    isSelected
+                                      ? "bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold scale-105"
+                                      : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
+                                  ].join(" ")}
+                                >
+                                  {dur === 0 ? "∞ Bebas" : `${dur}s`}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-400 italic">
+                            ⏳ Diatur oleh Pembuat Room:{" "}
+                            {(gameState.turnDurationLimit ?? 20) === 0
+                              ? "Tanpa Batas Waktu (Unlimited)"
+                              : `${gameState.turnDurationLimit ?? 20} detik`}
+                          </div>
+                        )}
                       </div>
 
                       {isHost ? (
@@ -1242,14 +1484,14 @@ export default function GameTable({
                           {isMyTurn && (
                             <div
                               className={[
-                                "px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold shadow-lg flex items-center gap-1 transition-colors",
-                                turnSecondsLeft <= 5
-                                  ? "bg-rose-950/95 border-rose-400 text-rose-200 animate-pulse"
+                                "px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold shadow-lg flex items-center justify-center transition-colors",
+                                turnSecondsLeft !== null && turnSecondsLeft <= 10
+                                  ? "bg-rose-950/95 border-rose-400 text-rose-200 animate-pulse ring-2 ring-rose-500/50"
                                   : "bg-slate-950/90 border-amber-400/60 text-amber-300",
                               ].join(" ")}
                             >
-                              <Sparkles className="w-3 h-3" /> GILIRANMU •{" "}
-                              {turnSecondsLeft}s
+                              GILIRANMU{" "}
+                              {turnSecondsLeft !== null ? `• ${turnSecondsLeft}s` : ""}
                             </div>
                           )}
 
@@ -1348,19 +1590,26 @@ export default function GameTable({
                           ))}
                         </div>
 
-                        {isHost ? (
+                        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                          {isHost && (
+                            <button
+                              onClick={handleStartRound}
+                              disabled={isSubmitting}
+                              className="px-5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg transition"
+                            >
+                              🚀 Main Lagi
+                            </button>
+                          )}
+
                           <button
-                            onClick={handleStartRound}
-                            disabled={isSubmitting}
-                            className="px-5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg transition"
+                            type="button"
+                            onClick={onLeaveRoom}
+                            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-xs shadow transition"
                           >
-                            🚀 Main Lagi
+                            <Home className="w-3.5 h-3.5" />
+                            <span>Kembali ke Main Menu</span>
                           </button>
-                        ) : (
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900 border border-amber-400/30 text-[11px] font-bold text-amber-300">
-                            ⏳ Menunggu pembuat room klik Main Lagi...
-                          </div>
-                        )}
+                        </div>
                       </div>
                     )}
                 </div>
@@ -1376,261 +1625,260 @@ export default function GameTable({
           <div className="relative z-20 shrink-0 pt-1">
             {/* Pill Error Mengambang Ringkas */}
             {errorMsg && (
-              <div className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 whitespace-nowrap">
+              <div className="pointer-events-none absolute -top-24 sm:-top-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 whitespace-nowrap">
                 <span className="px-3 py-0.5 rounded-full bg-rose-950/95 border border-rose-500 text-rose-200 text-[11px] font-bold shadow-lg">
                   ⚠️ {errorMsg}
                 </span>
               </div>
             )}
 
-            {/* Container Dock Bawah */}
-            <div className="bg-slate-950/90 border border-amber-500/30 rounded-2xl px-2.5 sm:px-4 py-1.5 sm:py-2 backdrop-blur-md shadow-2xl space-y-1.5">
-              {/* Baris 1: Kartu di Tangan Pemain (Tegak Lurus, Rapi, Tanpa Scrollbar!) */}
-              {gameState.phase !== "waiting" && (
-                <div
-                  className={[
-                    "w-full flex items-center justify-center flex-wrap pt-2 pb-0.5",
-                    myPlayer.hand.length > 14
-                      ? "-space-x-3 sm:-space-x-1.5 gap-y-1"
-                      : "-space-x-1.5 sm:space-x-0 sm:gap-1.5 gap-y-1",
-                  ].join(" ")}
-                >
-                  {myPlayer.hand.map((card) => {
-                    const isSelected = selectedCardIds.includes(card.id);
-                    const isBombCard = bombCardIdsSet.has(card.id);
-                    return (
-                      <PlayingCard
-                        key={card.id}
-                        card={card}
-                        selected={isSelected}
-                        highlightBomb={isBombCard}
-                        disabled={gameState.phase !== "playing"}
-                        onClick={() => toggleCardSelection(card.id)}
-                      />
-                    );
-                  })}
-                </div>
-              )}
+            {/* Container Dock Bawah: Layla di Kiri, Kartu di Samping Kanannya */}
+            <div
+              className={[
+                "relative bg-slate-950/90 border border-amber-500/30 rounded-2xl px-2 sm:px-3.5 py-1.5 backdrop-blur-md shadow-2xl transition-all",
+                isMyTurn &&
+                turnSecondsLeft !== null &&
+                turnSecondsLeft <= 10 &&
+                turnSecondsLeft > 0
+                  ? "animate-timer-subtle-shake border-rose-500/80 shadow-[0_0_25px_rgba(239,68,68,0.4)]"
+                  : "",
+              ].join(" ")}
+            >
 
-              {/* Baris 2: Karakter Kita + Tombol Ejek & Voice Chat (Kiri) | Tombol Aksi (Kanan) */}
-              <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pt-1.5 border-t border-slate-800/80">
-                {/* Kiri: Avatar Karakter Pemain + Tombol Emot Ngejek + Mic */}
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <PlayerSeat3D
-                    player={myPlayer}
-                    position="bottom"
-                    isCurrentTurn={isMyTurn}
-                    turnSecondsLeft={isMyTurn ? turnSecondsLeft : null}
-                    isMe
-                    activeTaunt={visibleTaunts[myPlayer.id] || null}
-                    onDismissTaunt={handleDismissMyTaunt}
-                    isMicOn={voice.micEnabled}
-                    isSpeaking={Boolean(voice.peerSpeaking[myPlayer.id])}
-                  />
-
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsTauntMenuOpen((prev) => !prev)}
-                      className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-600 hover:to-indigo-700 border border-purple-400/60 shadow transition"
-                    >
-                      <MessageSquareMore className="w-3.5 h-3.5 text-amber-300" />
-                      <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-white">
-                        Ejek
-                      </span>
-                    </button>
-
-                    {isTauntMenuOpen && (
-                      <div
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4"
-                        onClick={() => setIsTauntMenuOpen(false)}
-                      >
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full max-w-md max-h-[90%] overflow-y-auto bg-slate-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-[0_15px_40px_rgba(0,0,0,0.95)] space-y-2 animate-taunt-pop"
-                        >
-                          <div className="text-[11px] font-black text-amber-300 uppercase tracking-wider flex items-center justify-between border-b border-slate-800 pb-1">
-                            <span>😈 Ejek Lawan</span>
-                            <button
-                              type="button"
-                              onClick={() => setIsTauntMenuOpen(false)}
-                              className="text-slate-400 hover:text-white text-xs px-1"
-                            >
-                              ✕
-                            </button>
-                          </div>
-
-                          {/* Form Ketik Ejekan Custom */}
-                          <form
-                            onSubmit={handleCustomTauntSubmit}
-                            className="space-y-1.5"
-                          >
-                            {/* Pilihan Emot Cepat untuk Custom Text */}
-                            <div className="flex items-center justify-between gap-1 bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-800">
-                              {[
-                                "😈",
-                                "😂",
-                                "🔥",
-                                "😜",
-                                "🤡",
-                                "💀",
-                                "👑",
-                                "💣",
-                              ].map((emo) => (
-                                <button
-                                  key={emo}
-                                  type="button"
-                                  onClick={() => setCustomTauntEmoji(emo)}
-                                  className={[
-                                    "w-6 h-6 rounded-lg flex items-center justify-center text-sm transition",
-                                    customTauntEmoji === emo
-                                      ? "bg-amber-400/30 border border-amber-400 scale-110"
-                                      : "hover:bg-slate-800 opacity-75 hover:opacity-100",
-                                  ].join(" ")}
-                                >
-                                  {emo}
-                                </button>
-                              ))}
-                            </div>
-
-                            <div className="flex gap-1.5">
-                              <input
-                                type="text"
-                                maxLength={60}
-                                autoFocus
-                                value={customTauntText}
-                                onChange={(e) =>
-                                  setCustomTauntText(e.target.value)
-                                }
-                                placeholder="Ketik ejekanmu..."
-                                className="flex-1 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-xs text-white font-semibold"
-                              />
-                              <button
-                                type="submit"
-                                disabled={!customTauntText.trim()}
-                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs transition shrink-0"
-                              >
-                                Kirim
-                              </button>
-                            </div>
-                          </form>
-
-                          {/* Preset Ejekan Cepat 1-Klik */}
-                          <div className="grid grid-cols-2 gap-1 pt-1 border-t border-slate-800">
-                            {TAUNT_PRESETS.map((t) => (
-                              <button
-                                key={t.id}
-                                type="button"
-                                onClick={() => handleSendTaunt(t.id)}
-                                className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-slate-900 hover:bg-purple-900/60 border border-slate-800 hover:border-amber-400/60 text-left transition"
-                              >
-                                <span className="text-base leading-none">
-                                  {t.emoji}
-                                </span>
-                                <span className="text-[10px] font-bold text-slate-100 leading-tight">
-                                  {t.text}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+              {/* Jika Pemain Menyerah / Keluar: Tampilkan Status Kalah & Tombol Kembali ke Main Menu */}
+              {myPlayer.isForfeited ? (
+                <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-900/90 border border-rose-500/50 rounded-2xl text-center sm:text-left shadow-lg my-1">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-xl shrink-0">
+                      🏳️
+                    </div>
+                    <div>
+                      <div className="text-xs sm:text-sm font-black text-rose-300">
+                        Kamu telah keluar dari permainan ini
                       </div>
-                    )}
+                      <div className="text-[11px] text-slate-300">
+                        Dinyatakan kalah di posisi{" "}
+                        <span className="font-bold text-amber-300">
+                          #{myPlayer.finishRank}
+                        </span>{" "}
+                        (-10 pts). Permainan tetap berlanjut untuk pemain lain.
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Tombol Voice Chat Mic On/Off */}
                   <button
                     type="button"
-                    onClick={voice.toggleMic}
-                    disabled={voice.isConnectingMic}
-                    title={
-                      voice.micEnabled
-                        ? "Matikan Mikrofon (Mute)"
-                        : "Nyalakan Mikrofon untuk Ngobrol"
-                    }
-                    className={[
-                      "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border shadow transition",
-                      voice.micEnabled
-                        ? voice.peerSpeaking[myPlayer.id]
-                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 border-emerald-200 text-slate-950 shadow-[0_0_14px_rgba(16,185,129,0.75)] scale-105"
-                          : "bg-emerald-950/95 hover:bg-emerald-900 border-emerald-400/80 text-emerald-300"
-                        : "bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-300",
-                    ].join(" ")}
+                    onClick={onLeaveRoom}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-md transition transform active:scale-95 shrink-0"
                   >
-                    {voice.isConnectingMic ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
-                    ) : voice.micEnabled ? (
-                      <Mic className="w-3.5 h-3.5" />
-                    ) : (
-                      <MicOff className="w-3.5 h-3.5 text-rose-400" />
-                    )}
-                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider">
-                      {voice.micEnabled ? "Mic On" : "Mic"}
-                    </span>
-                  </button>
-
-                  {/* Tombol Speaker Suara Teman */}
-                  <button
-                    type="button"
-                    onClick={voice.toggleSpeaker}
-                    title={
-                      voice.speakerEnabled
-                        ? "Bisukan Suara Obrolan Lawan"
-                        : "Nyalakan Suara Obrolan Lawan"
-                    }
-                    className={[
-                      "p-1.5 rounded-xl border shadow transition",
-                      voice.speakerEnabled
-                        ? "bg-slate-900 hover:bg-slate-800 border-slate-700 text-amber-300"
-                        : "bg-rose-950/90 border-rose-500/60 text-rose-300",
-                    ].join(" ")}
-                  >
-                    {voice.speakerEnabled ? (
-                      <Headphones className="w-3.5 h-3.5" />
-                    ) : (
-                      <VolumeX className="w-3.5 h-3.5" />
-                    )}
+                    <Home className="w-4 h-4" />
+                    <span>Kembali ke Main Menu</span>
                   </button>
                 </div>
+              ) : (
+                /* KONTEN DOCK: KARTU 100% DI TENGAH LAYAR & DOCK, SELENA DI KIRI, CONTROLS DI KANAN */
+                <div className="relative flex items-center justify-center w-full min-h-[96px] sm:min-h-[104px]">
+                  {/* SISI KIRI: AVATAR 3D SELENA + NAMEPLATE (ANCHORED ABSOLUTE LEFT) */}
+                  <div className="absolute left-1 sm:left-2 bottom-0.5 z-20 flex items-end">
+                    <PlayerSeat3D
+                      player={myPlayer}
+                      position="bottom"
+                      isHost={gameState.hostId === myPlayer.id}
+                      isCurrentTurn={isMyTurn}
+                      turnSecondsLeft={isMyTurn ? turnSecondsLeft : null}
+                      isMe
+                      activeTaunt={visibleTaunts[myPlayer.id] || null}
+                      onDismissTaunt={handleDismissMyTaunt}
+                      isMicOn={voice.micEnabled}
+                      isSpeaking={Boolean(voice.peerSpeaking[myPlayer.id])}
+                    />
+                  </div>
 
-                {/* Kanan: Tombol Kapsul Aksi (Lewat & Banting Kartu) */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <button
-                    type="button"
-                    onClick={handlePassTurn}
-                    disabled={
-                      gameState.phase !== "playing" ||
-                      !isMyTurn ||
-                      !gameState.currentTablePlay ||
-                      isSubmitting
-                    }
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-rose-950 disabled:opacity-40 border border-slate-600 text-[11px] font-extrabold text-slate-200 shadow transition"
-                  >
-                    <SkipForward className="w-3 h-3" />
-                    <span>Lewat</span>
-                  </button>
+                  {/* SISI TENGAH: KARTU DI TANGAN (100% TRUE CENTER DI TENGAH DOCK & LAYAR) */}
+                  <div className="relative z-10 flex items-center justify-center max-w-[calc(100%-180px)] sm:max-w-[calc(100%-240px)]">
+                    <div className="relative inline-flex flex-col items-center">
+                      {/* TOMBOL AKSI UTAMA DI ATAS KARTU (LEWAT & BANTING KARTU) - DILETAKKAN CUKUP TINGGI AGAR TIDAK TERTUTUP KARTU */}
+                      {gameState.phase === "playing" && !myPlayer.isForfeited && (
+                        <div className="absolute -top-[68px] sm:-top-[78px] lg:-top-[84px] left-1/2 -translate-x-1/2 z-50 flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-2xl bg-slate-950/95 border-2 border-amber-400/60 shadow-[0_12px_32px_rgba(0,0,0,0.95)] backdrop-blur-md whitespace-nowrap">
+                          {/* Tombol Lewat */}
+                          <button
+                            type="button"
+                            onClick={handlePassTurn}
+                            disabled={
+                              gameState.phase !== "playing" ||
+                              !isMyTurn ||
+                              !gameState.currentTablePlay ||
+                              isSubmitting
+                            }
+                            className={[
+                              "flex items-center gap-1 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-black shadow-md transition transform active:scale-95",
+                              isMyTurn && gameState.currentTablePlay
+                                ? "bg-slate-800 hover:bg-rose-950/80 border-slate-600 hover:border-rose-500/60 text-slate-200 cursor-pointer"
+                                : "bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed opacity-40",
+                            ].join(" ")}
+                          >
+                            <SkipForward className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                            <span>Lewat</span>
+                          </button>
 
-                  <button
-                    type="button"
-                    onClick={handlePlaySelectedCards}
-                    disabled={
-                      gameState.phase !== "playing" ||
-                      selectedCardIds.length === 0 ||
-                      !beatValidation?.valid ||
-                      (!isMyTurn && !beatValidation?.isBomb) ||
-                      isSubmitting
-                    }
-                    className={[
-                      "py-1.5 px-4 sm:px-5 rounded-full font-black text-[11px] sm:text-xs uppercase tracking-wider shadow-lg transition transform active:scale-95",
-                      beatValidation?.isBomb
-                        ? "bg-gradient-to-r from-red-500 via-amber-400 to-red-500 text-slate-950 animate-pulse"
-                        : "bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 disabled:opacity-35",
-                    ].join(" ")}
-                  >
-                    {beatValidation?.isBomb ? "💣 BOM!" : "🃏 Banting Kartu"}
-                  </button>
+                          {/* Tombol Banting Kartu / BOM */}
+                          <button
+                            type="button"
+                            onClick={handlePlaySelectedCards}
+                            disabled={
+                              gameState.phase !== "playing" ||
+                              selectedCardIds.length === 0 ||
+                              !beatValidation?.valid ||
+                              (!isMyTurn && !beatValidation?.isBomb) ||
+                              isSubmitting
+                            }
+                            className={[
+                              "flex items-center gap-1.5 px-3.5 sm:px-5 py-1 sm:py-1.5 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider shadow-xl transition transform active:scale-95",
+                              beatValidation?.isBomb
+                                ? "bg-gradient-to-r from-red-600 via-amber-400 to-red-600 text-slate-950 animate-pulse border-2 border-yellow-300 ring-2 ring-red-500 cursor-pointer"
+                                : beatValidation?.valid && (isMyTurn || beatValidation?.isBomb)
+                                ? "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:from-amber-300 hover:to-yellow-200 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.5)] border border-amber-300 scale-105 cursor-pointer ring-2 ring-amber-400/40"
+                                : "bg-slate-900 border border-slate-700/80 text-slate-400 opacity-60 cursor-not-allowed",
+                            ].join(" ")}
+                          >
+                            {beatValidation?.isBomb ? (
+                              <>
+                                <Flame className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-slate-950 fill-current animate-bounce" />
+                                <span>💣 BOM!</span>
+                              </>
+                            ) : evaluatedSelectedCombo && beatValidation?.valid ? (
+                              <span>
+                                🃏 Banting {getComboDisplayLabel(evaluatedSelectedCombo)}
+                              </span>
+                            ) : (
+                              <span>🃏 Banting Kartu</span>
+                            )}
+                          </button>
+
+                          {/* Tombol Batal Pilihan Kartu */}
+                          {selectedCardIds.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCardIds([])}
+                              title="Batal pilih semua kartu"
+                              className="flex items-center gap-1 px-2 py-1 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[10px] sm:text-xs font-bold transition shadow-sm"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span className="hidden sm:inline">Batal</span>
+                              <span>({selectedCardIds.length})</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Kartu di Tangan Pemain */}
+                      {gameState.phase !== "waiting" && (
+                        <div
+                          className={[
+                            "flex items-center justify-center flex-wrap pt-0.5 pb-0.5",
+                            myPlayer.hand.length > 14
+                              ? "-space-x-3.5 sm:-space-x-2 gap-y-1"
+                              : "-space-x-2 sm:-space-x-1 sm:gap-1 gap-y-1",
+                          ].join(" ")}
+                        >
+                          {myPlayer.hand.map((card) => {
+                            const isSelected = selectedCardIds.includes(card.id);
+                            const isBombCard = bombCardIdsSet.has(card.id);
+                            return (
+                              <PlayingCard
+                                key={card.id}
+                                card={card}
+                                selected={isSelected}
+                                highlightBomb={isBombCard}
+                                disabled={gameState.phase !== "playing"}
+                                onClick={() => toggleCardSelection(card.id)}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SISI KANAN POJOK: KONTROL CHAT, MIC, HEADSET VERTIKAL + ROOM ID VERTIKAL (PROPORSI PAS DI DALAM CARD) */}
+                  <div className="absolute right-2 sm:right-3.5 top-1/2 -translate-y-1/2 z-20 flex items-center gap-1 sm:gap-1.5">
+                    {/* 3 Tombol Vertikal: Ejek, Mic, Speaker */}
+                    <div className="flex flex-col items-center gap-1">
+                      {/* Tombol Ejek Lawan */}
+                      <button
+                        type="button"
+                        onClick={() => setIsTauntMenuOpen(true)}
+                        title="Ejek Lawan & Kirim Emot"
+                        className="w-6 h-6 sm:w-6.5 sm:h-6.5 rounded-lg sm:rounded-xl bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-600 hover:to-indigo-700 border border-purple-400/60 shadow flex items-center justify-center transition transform active:scale-95"
+                      >
+                        <MessageSquareMore className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-300" />
+                      </button>
+
+                      {/* Tombol Voice Chat Mic On/Off (Icon Only) */}
+                      <button
+                        type="button"
+                        onClick={voice.toggleMic}
+                        disabled={voice.isConnectingMic}
+                        title={
+                          voice.micEnabled
+                            ? "Matikan Mikrofon (Mute)"
+                            : "Nyalakan Mikrofon untuk Ngobrol"
+                        }
+                        className={[
+                          "w-6 h-6 sm:w-6.5 sm:h-6.5 rounded-lg sm:rounded-xl border shadow flex items-center justify-center transition transform active:scale-95",
+                          voice.micEnabled
+                            ? voice.peerSpeaking[myPlayer.id]
+                              ? "bg-gradient-to-r from-emerald-500 to-teal-500 border-emerald-200 text-slate-950 shadow-[0_0_14px_rgba(16,185,129,0.75)] scale-105"
+                              : "bg-emerald-950/95 hover:bg-emerald-900 border-emerald-400/80 text-emerald-300"
+                            : "bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-300",
+                        ].join(" ")}
+                      >
+                        {voice.isConnectingMic ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+                        ) : voice.micEnabled ? (
+                          <Mic className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        ) : (
+                          <MicOff className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-400" />
+                        )}
+                      </button>
+
+                      {/* Tombol Speaker Suara Teman (Icon Only) */}
+                      <button
+                        type="button"
+                        onClick={voice.toggleSpeaker}
+                        title={
+                          voice.speakerEnabled
+                            ? "Bisukan Suara Obrolan Lawan"
+                            : "Nyalakan Suara Obrolan Lawan"
+                        }
+                        className={[
+                          "w-6 h-6 sm:w-6.5 sm:h-6.5 rounded-lg sm:rounded-xl border shadow flex items-center justify-center transition transform active:scale-95",
+                          voice.speakerEnabled
+                            ? "bg-slate-900 hover:bg-slate-800 border-slate-700 text-amber-300"
+                            : "bg-rose-950/90 border-rose-500/60 text-rose-300",
+                        ].join(" ")}
+                      >
+                        {voice.speakerEnabled ? (
+                          <Headphones className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        ) : (
+                          <VolumeX className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Room ID Vertikal di Paling Pojok Kanan Tray */}
+                    <div
+                      className="flex items-center justify-center select-none py-0.5"
+                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                      title={`Kode Room: ${gameState.roomCode}`}
+                    >
+                      <span className="font-mono text-[7px] sm:text-[8px] text-amber-400/80 font-black tracking-wider uppercase">
+                        #{gameState.roomCode}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -1670,6 +1918,144 @@ export default function GameTable({
               >
                 {isSubmitting ? "Keluar..." : "Ya, Keluar (Kalah)"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ejek Lawan & Kirim Emot Meja (Root Viewport - Tidak Pernah Terpotong) */}
+      {isTauntMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4"
+          onClick={() => setIsTauntMenuOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-slate-950 border-2 border-amber-400 rounded-3xl p-4 sm:p-5 shadow-[0_25px_60px_rgba(0,0,0,0.95)] space-y-4 animate-taunt-pop max-h-[92vh] overflow-y-auto"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">😈</span>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                    Ejek Lawan & Kirim Emot
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    Kirim emot kilat 1-klik atau ketik ejekan custom
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTauntMenuOpen(false)}
+                className="w-7 h-7 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs font-bold transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* SEKSI 1: KIRIM EMOT CEPAT (1-KLIK LANGSUNG MUNCUL DI AVATAR) */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                <span>⚡ Kirim Emot Kilat (1-Klik)</span>
+              </div>
+              <div className="grid grid-cols-6 gap-1.5 bg-slate-900/90 p-2 sm:p-2.5 rounded-2xl border border-slate-800">
+                {[
+                  { emo: "😈", label: "Ngejek" },
+                  { emo: "😂", label: "Ketawa" },
+                  { emo: "🔥", label: "Panas" },
+                  { emo: "😜", label: "Melet" },
+                  { emo: "🤡", label: "Badut" },
+                  { emo: "💀", label: "Mampus" },
+                  { emo: "👑", label: "Sultan" },
+                  { emo: "💣", label: "BOM" },
+                  { emo: "😭", label: "Nangis" },
+                  { emo: "💸", label: "Cuan" },
+                  { emo: "😎", label: "Santai" },
+                  { emo: "🤫", label: "Diem" },
+                ].map(({ emo, label }) => (
+                  <button
+                    key={emo}
+                    type="button"
+                    onClick={() => {
+                      handleSendTaunt("emoji_only", undefined, emo);
+                    }}
+                    title={`Kirim emot ${label}`}
+                    className="group relative flex flex-col items-center justify-center py-1.5 px-1 rounded-xl bg-slate-950/70 hover:bg-amber-400/20 border border-slate-800 hover:border-amber-400 text-2xl transition transform hover:scale-110 active:scale-95"
+                  >
+                    <span className="transition group-hover:animate-bounce">
+                      {emo}
+                    </span>
+                    <span className="text-[8px] font-bold text-slate-400 group-hover:text-amber-300 transition">
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* SEKSI 2: KATA-KATA EJEKAN PRESET (1-KLIK) */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-black uppercase tracking-wider text-purple-300 flex items-center gap-1">
+                <span>💬 Ejekan Siap Pakai</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                {TAUNT_PRESETS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => handleSendTaunt(t.id)}
+                    className="flex items-center gap-2 p-2 rounded-xl bg-slate-900/90 hover:bg-gradient-to-r hover:from-purple-900/50 hover:to-indigo-900/50 border border-slate-800 hover:border-purple-400 text-left transition transform active:scale-95"
+                  >
+                    <span className="text-xl shrink-0">{t.emoji}</span>
+                    <span className="text-[11px] font-bold text-slate-200 leading-tight">
+                      {t.text}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* SEKSI 3: KETIK EJEKAN CUSTOM SENDIRI */}
+            <div className="space-y-1.5 pt-1 border-t border-slate-800">
+              <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>✍️ Ketik Ejekan Sendiri</span>
+                <span className="text-[9px] font-mono text-slate-500">
+                  {customTauntText.length}/60
+                </span>
+              </div>
+              <form onSubmit={handleCustomTauntSubmit} className="space-y-2">
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emojis = ["😈", "😂", "🔥", "😜", "🤡", "💀", "👑", "💣"];
+                      const nextIdx = (emojis.indexOf(customTauntEmoji) + 1) % emojis.length;
+                      setCustomTauntEmoji(emojis[nextIdx]);
+                    }}
+                    title="Ganti Emot"
+                    className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 flex items-center justify-center text-xl transition shrink-0"
+                  >
+                    {customTauntEmoji}
+                  </button>
+                  <input
+                    type="text"
+                    maxLength={60}
+                    value={customTauntText}
+                    onChange={(e) => setCustomTauntText(e.target.value)}
+                    placeholder="Ketik ejekanmu di sini..."
+                    className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-xs text-white font-medium placeholder:text-slate-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!customTauntText.trim()}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md transition transform active:scale-95 shrink-0"
+                  >
+                    Kirim
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

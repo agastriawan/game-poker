@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   addPlayerToGame,
   createInitialGameState,
+  forfeitPlayer,
   getNormalScoreByRank,
   passTurn,
   playCards,
@@ -425,6 +426,74 @@ console.log("=== Menjalankan Unit Test Aturan Game Poker Online ===");
 
   console.log("✅ [PASS] Aturan Pemain A Habis Kartu, Semua Lawan Pass -> Pemain Setelah A Bebas Jalan");
 }
+
+function testPlayerForfeitKeepsGameRunning() {
+  let state = createInitialGameState({
+    roomCode: "FRFT01",
+    hostId: "user-a",
+    hostName: "Pemain A",
+  });
+  state = addPlayerToGame(state, { id: "user-b", name: "Pemain B", isBot: false });
+  state = addPlayerToGame(state, { id: "user-c", name: "Pemain C", isBot: false });
+  state = addPlayerToGame(state, { id: "user-d", name: "Pemain D", isBot: false });
+
+  state = {
+    ...state,
+    phase: "playing",
+    currentTurnPlayerId: "user-d",
+    currentTablePlay: null,
+    players: [
+      {
+        ...state.players[0],
+        hand: [makeCard("A", 14, "spades")],
+        finishRank: null,
+      },
+      {
+        ...state.players[1],
+        hand: [makeCard("4", 4, "hearts"), makeCard("5", 5, "hearts")],
+        finishRank: null,
+      },
+      {
+        ...state.players[2],
+        hand: [makeCard("6", 6, "hearts"), makeCard("7", 7, "hearts")],
+        finishRank: null,
+      },
+      {
+        ...state.players[3],
+        hand: [makeCard("8", 8, "hearts"), makeCard("9", 9, "hearts")],
+        finishRank: null,
+      },
+    ],
+  };
+
+  // 1. Pemain D keluar duluan (sedang giliran D)
+  state = forfeitPlayer(state, "user-d");
+  assert.equal(state.phase, "playing", "Permainan harus tetap berlanjut saat 1 pemain keluar!");
+  assert.equal(state.players[3].finishRank, 4, "Pemain D yang keluar pertama harus dapat rank #4");
+  assert.equal(state.players[3].lastRoundDelta, -10, "Pemain D harus kena penalti -10 poin");
+  assert.equal(state.players[3].isForfeited, true, "Pemain D harus ditandai isForfeited");
+  assert.equal(state.currentTurnPlayerId, "user-a", "Giliran harus otomatis oper ke pemain aktif berikutnya (A)");
+
+  // 2. Pemain C keluar berikutnya
+  state = forfeitPlayer(state, "user-c");
+  assert.equal(state.phase, "playing", "Permainan harus tetap berlanjut!");
+  assert.equal(state.players[2].finishRank, 3, "Pemain C yang keluar kedua harus dapat rank #3");
+  assert.equal(state.players[2].lastRoundDelta, -10, "Pemain C harus kena penalti -10 poin");
+
+  // 3. Sekarang tersisa 2 pemain aktif: A dan B. Pemain A menghabiskan kartunya!
+  state = playCards(state, "user-a", ["A-spades"]);
+  assert.equal(state.players[0].finishRank, 1, "Pemain A harus mendapat Juara #1");
+
+  // Hanya tersisa 1 orang aktif (B), sehingga ronde berakhir otomatis!
+  assert.equal(state.phase, "round_end", "Ronde harus selesai saat hanya tersisa 1 pemain");
+  assert.equal(state.players[1].finishRank, 2, "Pemain B yang tersisa harus otomatis mendapat rank #2");
+  assert.equal(state.players[0].lastRoundDelta, 30, "Juara 1 dalam mode 4 pemain dapat +30");
+  assert.equal(state.players[1].lastRoundDelta, 20, "Juara 2 dalam mode 4 pemain dapat +20");
+
+  console.log("✅ [PASS] Aturan Pemain Keluar: Langsung Kalah (#4, #3), Game Tetap Lanjut Sampai Sisa 1 Orang");
+}
+
+testPlayerForfeitKeepsGameRunning();
 
 console.log("\n🎉 SEMUA UNIT TEST BERHASIL 100% TANPA ERROR!");
 
