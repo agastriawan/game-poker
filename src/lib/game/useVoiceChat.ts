@@ -4,13 +4,57 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { PlayerState } from "./types";
 
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
+/**
+ * Konfigurasi STUN & TURN Servers untuk WebRTC Audio Chat
+ * Mendukung STUN untuk negosiasi IP publik langsung & TURN Server untuk menembus
+ * Symmetric NAT / CGNAT pada kartu seluler (Telkomsel/Indosat/XL) & beda Wi-Fi.
+ */
+function getRtcConfiguration(): RTCConfiguration {
+  const customTurnUrl = process.env.NEXT_PUBLIC_TURN_URL;
+  const customTurnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME;
+  const customTurnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
+
+  const iceServers: RTCIceServer[] = [
+    // 1. Google & Cloudflare STUN Servers (Deteksi IP publik direct P2P)
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
     { urls: "stun:stun.cloudflare.com:3478" },
-  ],
-};
+    { urls: "stun:openrelay.metered.ca:80" },
+
+    // 2. OpenRelay Free Global TURN Servers (UDP & TCP ports 80 & 443)
+    // Berfungsi menembus firewall ketat dan CGNAT jaringan seluler saat beda lokasi/Wi-Fi
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ];
+
+  // 3. Custom TURN Server jika dikonfigurasikan di .env.local
+  if (customTurnUrl && customTurnUsername && customTurnCredential) {
+    iceServers.unshift({
+      urls: customTurnUrl,
+      username: customTurnUsername,
+      credential: customTurnCredential,
+    });
+  }
+
+  return {
+    iceServers,
+    iceCandidatePoolSize: 10,
+  };
+}
 
 type SignalPayload =
   | {
@@ -157,7 +201,7 @@ export function useVoiceChat({
         return existing;
       }
 
-      const pc = new RTCPeerConnection(RTC_CONFIG);
+      const pc = new RTCPeerConnection(getRtcConfiguration());
       pcsRef.current[peerId] = pc;
       pendingCandidatesRef.current[peerId] = [];
 
@@ -197,12 +241,29 @@ export function useVoiceChat({
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        if (
+          pc.iceConnectionState === "failed" ||
+          pc.iceConnectionState === "disconnected"
+        ) {
+          try {
+            // Auto restart ICE jika jaringan berpindah (misal Wi-Fi ke data seluler)
+            if (typeof (pc as any).restartIce === "function") {
+              pc.restartIce();
+            }
+          } catch {}
+        }
+      };
+
       pc.onconnectionstatechange = () => {
         if (
           pc.connectionState === "failed" ||
           pc.connectionState === "closed"
         ) {
-          // Bersihkan jika putus total
+          try {
+            pc.close();
+          } catch {}
+          delete pcsRef.current[peerId];
         }
       };
 
