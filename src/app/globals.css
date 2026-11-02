@@ -200,3 +200,130 @@ body {
   }
 }
 
+/* =========================================================================
+   RESPONSIVE IN-GAME TABLE KHUSUS MODE HANDPHONE (HEIGHT <= 480px ATAU MOBILE PORTRAIT)
+   TIDAK AKAN MEMENGARUHI TAMPILAN DESKTOP/LAPTOP SAMA SEKALI
+   ========================================================================= */
+@media screen and (max-height: 480px), screen and (max-width: 767px) and (orientation: portrait) {
+  /* Meja Kasino: Kurangi padding panggung agar meja tidak terpotong di kiri/kanan */
+  .perspective-stage {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    max-width: 96% !important;
+  }
+
+  .table-3d-rim {
+    border-radius: 65px !important;
+    padding: 3px !important;
+  }
+
+  .table-3d-rim > div {
+    height: 128px !important;
+    border-radius: 56px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  /* Slot kartu di meja kasino saat dibuang */
+  .player-table-slot {
+    height: 38px !important;
+    max-width: 105px !important;
+  }
+  .player-table-slot .playing-card-xs {
+    width: 24px !important;
+    height: 36px !important;
+  }
+
+  /* Kurangi tinggi avatar lawan atas agar tidak memakan setengah layar HP */
+  .top-seat-container {
+    padding-top: 0 !important;
+    margin-bottom: -1rem !important;
+  }
+  .top-seat-container .player-avatar-3d {
+    width: 76px !important;
+    height: 90px !important;
+  }
+
+  /* Kurangi lebar avatar samping kiri & kanan agar tidak menjepit meja kasino */
+  .side-seat-left .player-avatar-3d,
+  .side-seat-right .player-avatar-3d {
+    width: 68px !important;
+    height: 82px !important;
+  }
+  .side-seat-left {
+    left: 2px !important;
+  }
+  .side-seat-right {
+    right: 2px !important;
+  }
+
+  /* Nameplate dan badge kartu lawan lebih compact di HP */
+  .top-seat-container .player-nameplate,
+  .side-seat-left .player-nameplate,
+  .side-seat-right .player-nameplate,
+  .bottom-dock-container .player-nameplate {
+    padding: 1.5px 6px !important;
+  }
+  .top-seat-container .player-nameplate span,
+  .side-seat-left .player-nameplate span,
+  .side-seat-right .player-nameplate span,
+  .bottom-dock-container .player-nameplate span {
+    font-size: 10px !important;
+  }
+  .player-card-badge {
+    margin-top: 1px !important;
+    padding: 1px 5px !important;
+    font-size: 8px !important;
+  }
+
+  /* Bottom Dock di HP: hemat ruang vertikal */
+  .bottom-dock-container {
+    min-height: 72px !important;
+  }
+
+  .bottom-dock-container .player-avatar-3d {
+    width: 68px !important;
+    height: 80px !important;
+    margin-top: -1.5rem !important;
+  }
+
+  /* Kartu tangan di HP: proporsional dan tidak menabrak bar aksi */
+  .bottom-dock-container .playing-card-md {
+    width: 40px !important;
+    height: 58px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Posisi Tombol Aksi (Lewat, Banting Kartu, Batal) di HP: */
+  /* Ditempatkan pas di sela antara dock kartu dan rim meja bawah (-top-10) */
+  /* sehingga kartu di tengah meja kasino TIDAK AKAN TERTUTUP LAGI! */
+  .action-buttons-bar {
+    top: -40px !important;
+    padding: 2.5px 8px !important;
+    border-radius: 12px !important;
+    gap: 4px !important;
+  }
+  .action-buttons-bar button {
+    padding: 3px 8px !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Kontrol pojok kanan tray (chat, mic, speaker) */
+  .bottom-right-controls {
+    right: 4px !important;
+    gap: 2px !important;
+  }
+  .bottom-right-controls button {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 8px !important;
+  }
+  .bottom-right-controls svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+}
+

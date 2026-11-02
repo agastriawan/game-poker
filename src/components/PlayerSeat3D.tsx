@@ -191,7 +191,7 @@ export default function PlayerSeat3D({
             isCurrentTurn={isCurrentTurn}
             isSpeaking={isSpeaking}
             isForfeited={player.isForfeited}
-            className={avatarSizeClass}
+            className={[avatarSizeClass, "player-avatar-3d"].join(" ")}
             fallback={
               <div className="w-16 h-16 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-bold">
                 {charProfile.heroName}
@@ -272,7 +272,7 @@ export default function PlayerSeat3D({
       >
         <div
           className={[
-            "px-2.5 py-1 rounded-xl bg-slate-950/90 border backdrop-blur-md shadow-[0_8px_20px_rgba(0,0,0,0.85)] flex items-center gap-1.5 transition-all",
+            "player-nameplate px-2.5 py-1 rounded-xl bg-slate-950/90 border backdrop-blur-md shadow-[0_8px_20px_rgba(0,0,0,0.85)] flex items-center gap-1.5 transition-all",
             isCurrentTurn
               ? "border-amber-400 ring-2 ring-amber-400/50 scale-105"
               : "border-amber-400/40",
@@ -303,7 +303,7 @@ export default function PlayerSeat3D({
 
         {/* SISA KARTU DI TANGAN LAWAN (BADGE KARTU RAPI DI BAWAH NAMEPLATE) */}
         {!isMe && player.hand.length > 0 && (
-          <div className="mt-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-red-950 to-slate-950 border border-amber-400/50 shadow text-[9px] font-black text-amber-300 flex items-center gap-1">
+          <div className="player-card-badge mt-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-red-950 to-slate-950 border border-amber-400/50 shadow text-[9px] font-black text-amber-300 flex items-center gap-1">
             <span>🃏</span>
             <span>{player.hand.length} kartu</span>
           </div>

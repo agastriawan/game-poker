@@ -74,7 +74,7 @@ function PlayerTableSlot({
 
   if (!latestPlay) {
     return (
-      <div className="flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0">
+      <div className="player-table-slot flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0">
         {player.hasPassedThisTrick ? (
           <div className="px-2.5 py-0.5 rounded-full bg-slate-950/85 border border-rose-500/50 text-[9px] sm:text-[10px] font-black text-rose-300">
             PASS
@@ -87,7 +87,7 @@ function PlayerTableSlot({
   return (
     <div
       key={latestPlay.timestamp}
-      className="relative flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0 animate-card-throw"
+      className="player-table-slot relative flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0 animate-card-throw"
     >
       {/* Deretan Kartu yang Dibuang pada Putaran Ini di Depan Meja Masing-Masing */}
       <div
@@ -1123,7 +1123,7 @@ export default function GameTable({
         {/* ZONA ATAS & TENGAH: KURSI LAWAN (KIRI, ATAS, KANAN) + MEJA OVAL 3D */}
         <div className="relative flex-1 min-h-0 flex flex-col items-center justify-center w-full">
           {/* KURSI LAWAN ATAS (KARAKTER 3D BESAR BERADA DI BELAKANG MEJA) */}
-          <div className="flex justify-center items-center shrink-0 pt-1 sm:pt-2 -mb-5 sm:-mb-7 lg:-mb-8 z-20">
+          <div className="top-seat-container flex justify-center items-center shrink-0 pt-1 sm:pt-2 -mb-5 sm:-mb-7 lg:-mb-8 z-20">
             {seatAssignments.top ? (
               <PlayerSeat3D
                 player={seatAssignments.top}
@@ -1150,7 +1150,7 @@ export default function GameTable({
           <div className="relative w-full flex items-center justify-center">
             {/* KURSI LAWAN KIRI (POSISI LEBIH KE ATAS AGAR NAMA, POIN & KARTU TIDAK TERPOTONG) */}
             {seatAssignments.left && (
-              <div className="flex absolute left-0 sm:left-1 lg:left-4 top-[30%] sm:top-[32%] -translate-y-1/2 z-20">
+              <div className="side-seat-left flex absolute left-0 sm:left-1 lg:left-4 top-[30%] sm:top-[32%] -translate-y-1/2 z-20">
                 <PlayerSeat3D
                   player={seatAssignments.left}
                   position="left"
@@ -1176,7 +1176,7 @@ export default function GameTable({
 
             {/* KURSI LAWAN KANAN (POSISI LEBIH KE ATAS AGAR NAMA, POIN & KARTU TIDAK TERPOTONG) */}
             {seatAssignments.right && (
-              <div className="flex absolute right-0 sm:right-1 lg:right-4 top-[30%] sm:top-[32%] -translate-y-1/2 z-20">
+              <div className="side-seat-right flex absolute right-0 sm:right-1 lg:right-4 top-[30%] sm:top-[32%] -translate-y-1/2 z-20">
                 <PlayerSeat3D
                   player={seatAssignments.right}
                   position="right"
@@ -1677,7 +1677,7 @@ export default function GameTable({
                 </div>
               ) : (
                 /* KONTEN DOCK: KARTU 100% DI TENGAH LAYAR & DOCK, SELENA DI KIRI, CONTROLS DI KANAN */
-                <div className="relative flex items-center justify-center w-full min-h-[96px] sm:min-h-[104px]">
+                <div className="bottom-dock-container relative flex items-center justify-center w-full min-h-[96px] sm:min-h-[104px]">
                   {/* SISI KIRI: AVATAR 3D SELENA + NAMEPLATE (ANCHORED ABSOLUTE LEFT) */}
                   <div className="absolute left-1 sm:left-2 bottom-0.5 z-20 flex items-end">
                     <PlayerSeat3D
@@ -1699,7 +1699,7 @@ export default function GameTable({
                     <div className="relative inline-flex flex-col items-center">
                       {/* TOMBOL AKSI UTAMA DI ATAS KARTU (LEWAT & BANTING KARTU) - DILETAKKAN CUKUP TINGGI AGAR TIDAK TERTUTUP KARTU */}
                       {gameState.phase === "playing" && !myPlayer.isForfeited && (
-                        <div className="absolute -top-[68px] sm:-top-[78px] lg:-top-[84px] left-1/2 -translate-x-1/2 z-50 flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-2xl bg-slate-950/95 border-2 border-amber-400/60 shadow-[0_12px_32px_rgba(0,0,0,0.95)] backdrop-blur-md whitespace-nowrap">
+                        <div className="action-buttons-bar absolute -top-[68px] sm:-top-[78px] lg:-top-[84px] left-1/2 -translate-x-1/2 z-50 flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-2xl bg-slate-950/95 border-2 border-amber-400/60 shadow-[0_12px_32px_rgba(0,0,0,0.95)] backdrop-blur-md whitespace-nowrap">
                           {/* Tombol Lewat */}
                           <button
                             type="button"
@@ -1801,7 +1801,7 @@ export default function GameTable({
                   </div>
 
                   {/* SISI KANAN POJOK: KONTROL CHAT, MIC, HEADSET VERTIKAL + ROOM ID VERTIKAL (PROPORSI PAS DI DALAM CARD) */}
-                  <div className="absolute right-2 sm:right-3.5 top-1/2 -translate-y-1/2 z-20 flex items-center gap-1 sm:gap-1.5">
+                  <div className="bottom-right-controls absolute right-2 sm:right-3.5 top-1/2 -translate-y-1/2 z-20 flex items-center gap-1 sm:gap-1.5">
                     {/* 3 Tombol Vertikal: Ejek, Mic, Speaker */}
                     <div className="flex flex-col items-center gap-1">
                       {/* Tombol Ejek Lawan */}

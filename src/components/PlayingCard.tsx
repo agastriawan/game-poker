@@ -96,6 +96,7 @@ export default function PlayingCard({
       onClick={onClick}
       className={[
         "group relative overflow-hidden bg-white select-none shrink-0",
+        size === "md" ? "playing-card-md" : size === "xs" ? "playing-card-xs" : "",
         "transition-all duration-200 ease-out will-change-transform",
         dimensions,
         isRed ? "text-rose-600" : "text-slate-900",
