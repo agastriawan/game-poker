@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   BookOpen,
+  Menu,
   Bot,
   Clock,
   Dices,
@@ -17,6 +18,7 @@ import {
   Users,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import GameTable from "@/components/GameTable";
 import PlayingCard from "@/components/PlayingCard";
@@ -72,6 +74,7 @@ export default function HomePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
   const [isDownloadOpen, setIsDownloadOpen] = useState<boolean>(false);
+  const [isNavMenuOpen, setIsNavMenuOpen] = useState<boolean>(false);
   const [selectedShowcaseIds, setSelectedShowcaseIds] = useState<string[]>([
     "3-spades",
     "2-spades",
@@ -445,82 +448,127 @@ export default function HomePage() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          {/* BGM Toggle */}
-          <button
-            type="button"
-            onClick={handleToggleBgm}
-            title={bgmOn ? "Musik Menyala" : "Musik Mati"}
-            className={[
-              "p-2 sm:px-3 sm:py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5",
-              bgmOn
-                ? "bg-amber-500/25 border-amber-400 text-amber-300"
-                : "bg-slate-900/90 border-slate-700 text-slate-300 hover:text-white",
-            ].join(" ")}
-          >
-            <Music className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden md:inline">
-              {bgmOn ? "BGM On" : "BGM Off"}
-            </span>
-          </button>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Tombol Rotasi / Fullscreen (Satu-satunya tombol aksi langsung di samping hamburger) */}
+          <OrientationToggleBtn size="sm" />
 
-          {/* SFX Toggle */}
+          {/* Tombol Hamburger Menu (Menampung semua tombol lainnya) */}
           <button
             type="button"
-            onClick={handleToggleSfx}
-            title={sfxOn ? "Efek Suara Menyala" : "Efek Suara Mati"}
-            className={[
-              "p-2 sm:px-3 sm:py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5",
-              sfxOn
-                ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
-                : "bg-slate-900/90 border-slate-700 text-slate-400",
-            ].join(" ")}
+            onClick={() => setIsNavMenuOpen((prev) => !prev)}
+            title="Menu & Pengaturan"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/60 text-amber-300 transition shadow active:scale-95 flex items-center gap-1.5"
           >
-            {sfxOn ? (
-              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            {isNavMenuOpen ? (
+              <X className="w-4 h-4 text-rose-400" />
             ) : (
-              <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <Menu className="w-4 h-4" />
             )}
-            <span className="hidden md:inline">SFX</span>
-          </button>
-
-          {/* Mode Vertikal / Horizontal (Layar Penuh) */}
-          <OrientationToggleBtn />
-
-          {/* Unduh App (Ikon di HP, Teks di Layar Luas) */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.playCardClick();
-              setIsDownloadOpen(true);
-            }}
-            className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/25 to-teal-500/25 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-400/60 text-xs font-black text-emerald-300 transition shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-            title="Unduh Aplikasi Android / Pasang di HP"
-          >
-            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse text-emerald-400" />
-            <span className="hidden sm:inline">Unduh App</span>
-          </button>
-
-          {/* Aturan (Ikon di HP, Teks di Layar Luas) */}
-          <button
-            type="button"
-            onClick={() => setIsRulesOpen(true)}
-            className="flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-400/50 text-xs font-extrabold text-amber-300 transition shadow-lg"
-            title="Panduan Aturan Permainan"
-          >
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden sm:inline">Aturan</span>
+            <span className="text-xs font-bold hidden sm:inline">Menu</span>
           </button>
         </div>
       </header>
+
+      {/* DROPDOWN HAMBURGER MENU (BGM, SFX, UNDUH APP, ATURAN) */}
+      {isNavMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-end p-3 pt-14 sm:pt-16"
+          onClick={() => setIsNavMenuOpen(false)}
+        >
+          <div
+            className="w-64 bg-slate-950/95 border-2 border-amber-400/70 rounded-2xl p-3 shadow-[0_20px_50px_rgba(0,0,0,0.95)] space-y-2 animate-taunt-pop"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+              <span className="text-xs font-black uppercase text-amber-300 tracking-wider">
+                Menu & Pengaturan
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsNavMenuOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Toggle BGM */}
+            <button
+              type="button"
+              onClick={handleToggleBgm}
+              className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition text-xs font-bold text-slate-200"
+            >
+              <div className="flex items-center gap-2">
+                <Music className="w-4 h-4 text-amber-400" />
+                <span>Musik (BGM)</span>
+              </div>
+              <span className={bgmOn ? "text-amber-300" : "text-slate-500"}>
+                {bgmOn ? "On" : "Off"}
+              </span>
+            </button>
+
+            {/* Toggle SFX */}
+            <button
+              type="button"
+              onClick={handleToggleSfx}
+              className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition text-xs font-bold text-slate-200"
+            >
+              <div className="flex items-center gap-2">
+                {sfxOn ? (
+                  <Volume2 className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-slate-500" />
+                )}
+                <span>Efek Suara (SFX)</span>
+              </div>
+              <span className={sfxOn ? "text-emerald-300" : "text-slate-500"}>
+                {sfxOn ? "On" : "Off"}
+              </span>
+            </button>
+
+            {/* Unduh Aplikasi Android */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playCardClick();
+                setIsNavMenuOpen(false);
+                setIsDownloadOpen(true);
+              }}
+              className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition text-xs font-bold text-emerald-300"
+            >
+              <div className="flex items-center gap-2">
+                <Download className="w-4 h-4 text-emerald-400" />
+                <span>Unduh Aplikasi Android</span>
+              </div>
+              <span className="text-[10px] bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-500/50">APK</span>
+            </button>
+
+            {/* Aturan Permainan */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsNavMenuOpen(false);
+                setIsRulesOpen(true);
+              }}
+              className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition text-xs font-bold text-amber-200"
+            >
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-amber-400" />
+                <span>Aturan Permainan</span>
+              </div>
+              <span className="text-[10px] text-slate-400">Panduan</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ================================================================= */}
       {/* TENGAH: PANGGUNG KARAKTER 3D INTERAKTIF & PANEL MASUK PERMAINAN   */}
       {/* ================================================================= */}
       <main className="relative z-10 max-w-6xl w-full mx-auto flex-1 min-h-0 flex items-center justify-center">
-        <div className="w-full grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 items-center">
+        <div className="w-full flex lg:grid lg:grid-cols-12 gap-4 lg:gap-6 items-center justify-center">
           {/* KOLOM KIRI: PANGGUNG INTERAKTIF KARAKTER 3D & KARTU MEJA */}
-          <div className="sm:col-span-5 lg:col-span-6 flex flex-col items-center justify-center space-y-1.5 sm:space-y-2">
+          <div className="hidden lg:flex lg:col-span-6 flex-col items-center justify-center space-y-2 sm:space-y-3">
             {/* Panggung Meja Mini 3D + Karakter yang Bisa Diklik */}
             <div className="perspective-stage w-full max-w-xs sm:max-w-md">
               <div className="table-3d-rim rounded-[36px] sm:rounded-[60px] p-1.5 sm:p-2.5 border-2 border-amber-400/50">
@@ -603,7 +651,7 @@ export default function HomePage() {
           </div>
 
           {/* KOLOM KANAN: KONTROL MASUK PERMAINAN (MABAR & VS BOT) */}
-          <div className="sm:col-span-7 lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-2xl sm:rounded-3xl p-2.5 sm:p-3.5 lg:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl space-y-2 sm:space-y-3">
+          <div className="w-full max-w-md lg:max-w-none lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-2xl sm:rounded-3xl p-3 sm:p-5 lg:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl space-y-2.5 sm:space-y-3.5">
             {/* Input Nama Panggilan + Tombol Acak Nama */}
             <div className="space-y-1 sm:space-y-1.5">
               <label className="block text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-300">
@@ -760,18 +808,19 @@ export default function HomePage() {
                   Main di HP lebih seru &amp; layar penuh!
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <OrientationToggleBtn variant="pill" size="sm" />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <OrientationToggleBtn variant="pill" size="sm" showLabel={false} />
                 <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playCardClick();
-                  setIsDownloadOpen(true);
-                }}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-[10px] sm:text-[11px] font-black transition flex items-center gap-1.5 shadow"
-              >
-                <Download className="w-3 h-3" />
-                <span>Unduh APK</span>
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playCardClick();
+                    setIsDownloadOpen(true);
+                  }}
+                  title="Unduh Aplikasi Android (APK)"
+                  className="p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-[10px] sm:text-[11px] font-black transition flex items-center gap-1 shadow"
+                >
+                  <Download className="w-3 h-3 text-emerald-400" />
+                  <span className="hidden sm:inline">Unduh APK</span>
                 </button>
               </div>
             </div>
