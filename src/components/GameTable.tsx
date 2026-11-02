@@ -37,6 +37,7 @@ import PlayingCard from "./PlayingCard";
 import PlayerSeat3D from "./PlayerSeat3D";
 import RulesModal from "./RulesModal";
 import WaitingRoomLobby from "./WaitingRoomLobby";
+import RotatePrompt from "./RotatePrompt";
 import { soundEngine } from "@/lib/audio/sound-engine";
 import { getNextBotAction } from "@/lib/game/bot";
 import { TAUNT_PRESETS } from "@/lib/game/engine";
@@ -964,6 +965,8 @@ export default function GameTable({
         isBombShaking ? "animate-screen-bomb" : "",
       ].join(" ")}
     >
+      <RotatePrompt />
+
       {/* DEKORASI CAHAYA RUANGAN GRAND CASINO LOUNGE */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {/* Partikel Cahaya Emas Mengambang */}

@@ -179,25 +179,10 @@ body {
   animation: timerSubtleShake 0.35s ease-in-out infinite;
 }
 
-/* Paksa Mode Horizontal (Landscape) Otomatis saat In-Game di Handphone (Portrait) */
+/* Panggung In-Game & Waiting Room Responsive */
 .ingame-landscape-stage {
-  width: 100dvw;
-  height: 100dvh;
-  max-height: 100dvh;
-}
-
-@media screen and (max-width: 767px) and (orientation: portrait) {
-  .ingame-landscape-stage {
-    position: fixed !important;
-    top: 0;
-    left: 100dvw;
-    width: 100dvh !important;
-    height: 100dvw !important;
-    max-height: 100dvw !important;
-    transform-origin: top left;
-    transform: rotate(90deg);
-    z-index: 50;
-  }
+  width: 100%;
+  min-height: 100dvh;
 }
 
 /* =========================================================================

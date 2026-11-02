@@ -418,75 +418,80 @@ export default function HomePage() {
       {/* ================================================================= */}
       {/* TOP BAR RINGKAS: LOGO KIRI + TOMBOL AUDIO & ATURAN KANAN          */}
       {/* ================================================================= */}
-      <header className="relative z-20 max-w-6xl w-full mx-auto shrink-0 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <header className="relative z-20 max-w-6xl w-full mx-auto shrink-0 flex items-center justify-between gap-2 px-1">
+        <div className="flex items-center gap-2 sm:gap-3">
           <img
             src="/logo.png"
             alt="Poker Barudak"
-            className="h-12 sm:h-16 w-auto object-contain drop-shadow-[0_4px_14px_rgba(245,158,11,0.55)]"
+            className="h-8 sm:h-14 w-auto object-contain drop-shadow-[0_4px_14px_rgba(245,158,11,0.55)]"
           />
-          <h1 className="font-black text-base sm:text-xl tracking-wide text-white leading-none">
+          <h1 className="font-black text-xs sm:text-xl tracking-wide text-white leading-none hidden xs:block">
             POKER BARUDAK
           </h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* BGM Toggle */}
           <button
             type="button"
             onClick={handleToggleBgm}
-            title="Nyalakan / Matikan Backsound"
+            title={bgmOn ? "Musik Menyala" : "Musik Mati"}
             className={[
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition",
+              "p-2 sm:px-3 sm:py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5",
               bgmOn
                 ? "bg-amber-500/25 border-amber-400 text-amber-300"
                 : "bg-slate-900/90 border-slate-700 text-slate-300 hover:text-white",
             ].join(" ")}
           >
-            <Music className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">
+            <Music className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden md:inline">
               {bgmOn ? "BGM On" : "BGM Off"}
             </span>
           </button>
 
+          {/* SFX Toggle */}
           <button
             type="button"
             onClick={handleToggleSfx}
-            title="Nyalakan / Matikan Efek Suara"
+            title={sfxOn ? "Efek Suara Menyala" : "Efek Suara Mati"}
             className={[
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition",
+              "p-2 sm:px-3 sm:py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5",
               sfxOn
                 ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
                 : "bg-slate-900/90 border-slate-700 text-slate-400",
             ].join(" ")}
           >
             {sfxOn ? (
-              <Volume2 className="w-3.5 h-3.5" />
+              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             ) : (
-              <VolumeX className="w-3.5 h-3.5" />
+              <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             )}
-            <span className="hidden sm:inline">SFX</span>
+            <span className="hidden md:inline">SFX</span>
           </button>
 
+          {/* Unduh App (Ikon di HP, Teks di Layar Luas) */}
           <button
             type="button"
             onClick={() => {
               soundEngine.playCardClick();
               setIsDownloadOpen(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/25 to-teal-500/25 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-400/60 text-xs font-black text-emerald-300 transition shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+            className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/25 to-teal-500/25 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-400/60 text-xs font-black text-emerald-300 transition shadow-[0_0_15px_rgba(16,185,129,0.2)]"
             title="Unduh Aplikasi Android / Pasang di HP"
           >
-            <Download className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-            <span>Unduh App</span>
+            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse text-emerald-400" />
+            <span className="hidden sm:inline">Unduh App</span>
           </button>
 
+          {/* Aturan (Ikon di HP, Teks di Layar Luas) */}
           <button
             type="button"
             onClick={() => setIsRulesOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-400/50 text-xs font-extrabold text-amber-300 transition shadow-lg"
+            className="flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-400/50 text-xs font-extrabold text-amber-300 transition shadow-lg"
+            title="Panduan Aturan Permainan"
           >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Aturan</span>
+            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Aturan</span>
           </button>
         </div>
       </header>
@@ -519,7 +524,7 @@ export default function HomePage() {
                       )
                     }
                     title="Klik untuk ganti karakter 3D!"
-                    className="relative w-32 h-36 sm:w-64 sm:h-76 lg:w-72 lg:h-84 flex items-center justify-center transition transform hover:scale-105 cursor-pointer select-none group"
+                    className="relative w-28 h-32 sm:w-64 sm:h-76 lg:w-72 lg:h-84 flex items-center justify-center transition transform hover:scale-105 cursor-pointer select-none group"
                   >
                     {/* Bayangan Halus di Bawah Kaki Karakter (Tanpa Garis Lonjong Kaku) */}
                     <div className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-24 sm:w-40 h-4 sm:h-5 rounded-full bg-black/40 blur-md" />
