@@ -796,7 +796,42 @@ export function passTurn(state: GameState, playerId: string): GameState {
   // Masih ada pemain yang belum Pass, lanjutkan giliran ke pemain tersebut
   let nextTurnId = findNextActivePlayerId(updatedPlayers, playerId, false);
   if (!nextTurnId) {
-    nextTurnId = tableOwnerId;
+    if (
+      tableOwner &&
+      tableOwner.finishRank === null &&
+      tableOwner.hand.length > 0
+    ) {
+      nextTurnId = tableOwnerId;
+    } else {
+      // Jika pemilik kartu di meja sudah habis kartunya (misal pemain A sudah menang)
+      // dan seluruh pemain tidak ada yang membantai kartu tersebut,
+      // maka meja dikosongkan dan pemain aktif setelah A bebas mengeluarkan kartu apapun!
+      const resetPassPlayers = updatedPlayers.map((p) => ({
+        ...p,
+        hasPassedThisTrick: false,
+      }));
+      const nextLeaderId = findNextActivePlayerId(
+        resetPassPlayers,
+        tableOwnerId,
+        true
+      );
+      const leaderName =
+        resetPassPlayers.find((p) => p.id === nextLeaderId)?.name || "Pemain";
+
+      newLogs.push(
+        `✨ Semua lawan lewat! Meja dikosongkan — ${leaderName} bebas mengeluarkan kombinasi baru.`
+      );
+
+      return {
+        ...state,
+        players: resetPassPlayers,
+        currentTurnPlayerId: nextLeaderId,
+        currentTablePlay: null,
+        trickPile: [],
+        logs: newLogs,
+        updatedAt: Date.now(),
+      };
+    }
   }
 
   return {

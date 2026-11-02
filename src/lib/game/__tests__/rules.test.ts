@@ -3,6 +3,7 @@ import {
   addPlayerToGame,
   createInitialGameState,
   getNormalScoreByRank,
+  passTurn,
   playCards,
   startNewRound,
   submitPlayerThrees,
@@ -315,6 +316,114 @@ console.log("=== Menjalankan Unit Test Aturan Game Poker Online ===");
   );
 
   console.log("✅ [PASS] Aturan Baru: Kartu Poker (2) Tidak Boleh Ditaruh di Paling Akhir");
+}
+
+// 8. Uji Full House Seri Sejenis + 2 Buntut (Contoh: 9♦ 10♦ J♦ + 5♥ 5♠)
+{
+  const fhSeri910J = evaluateCombo([
+    makeCard("5", 5, "hearts"),
+    makeCard("5", 5, "spades"),
+    makeCard("9", 9, "diamonds"),
+    makeCard("10", 10, "diamonds"),
+    makeCard("J", 11, "diamonds"),
+  ]);
+
+  assert.notEqual(fhSeri910J, null, "9-10-J wajik + 5-5 buntut harus diakui sebagai kombinasi sah");
+  assert.equal(fhSeri910J?.type, "full_house");
+  assert.equal(fhSeri910J?.primaryValue, 11, "Primary value harus nilai kartu tertinggi seri (J = 11)");
+
+  // Full House klasik 8 (8-8-8 + 3-3, primaryValue 8)
+  const fh8 = evaluateCombo([
+    makeCard("8", 8, "spades"),
+    makeCard("8", 8, "hearts"),
+    makeCard("8", 8, "clubs"),
+    makeCard("3", 3, "spades"),
+    makeCard("3", 3, "hearts"),
+  ])!;
+
+  assert.equal(
+    canBeatPlay(fhSeri910J!, fh8).valid,
+    true,
+    "Full House Seri 9-10-J (11) harus bisa mengalahkan Full House 8 (8)"
+  );
+
+  // Full House klasik Q (Q-Q-Q + 3-3, primaryValue 12)
+  const fhQ = evaluateCombo([
+    makeCard("Q", 12, "spades"),
+    makeCard("Q", 12, "hearts"),
+    makeCard("Q", 12, "clubs"),
+    makeCard("3", 3, "spades"),
+    makeCard("3", 3, "hearts"),
+  ])!;
+
+  assert.equal(
+    canBeatPlay(fhQ, fhSeri910J!).valid,
+    true,
+    "Full House Q (12) harus bisa mengalahkan Full House Seri 9-10-J (11)"
+  );
+
+  console.log("✅ [PASS] Aturan Full House Seri Sejenis + 2 Buntut (9-10-J♦ + 5♥ 5♠)");
+}
+
+// 9. Uji Pemain A Habis Kartu, Seluruh Lawan Pass -> Pemain Setelah A Bebas Mengeluarkan Kartu Apapun
+{
+  let state = createInitialGameState({
+    roomCode: "TEST99",
+    hostId: "user-a",
+    hostName: "Pemain A",
+  });
+  state = addPlayerToGame(state, { id: "user-b", name: "Pemain B", isBot: false });
+  state = addPlayerToGame(state, { id: "user-c", name: "Pemain C", isBot: false });
+
+  // Set kartu: A sisa 1 kartu (K♠), B punya [4♥, 5♥], C punya [6♥, 7♥]
+  state = {
+    ...state,
+    phase: "playing",
+    currentTurnPlayerId: "user-a",
+    currentTablePlay: null,
+    players: [
+      {
+        ...state.players[0],
+        hand: [makeCard("K", 13, "spades")],
+        finishRank: null,
+      },
+      {
+        ...state.players[1],
+        hand: [makeCard("4", 4, "hearts"), makeCard("5", 5, "hearts")],
+        finishRank: null,
+      },
+      {
+        ...state.players[2],
+        hand: [makeCard("6", 6, "hearts"), makeCard("7", 7, "hearts")],
+        finishRank: null,
+      },
+    ],
+  };
+
+  // 1. Pemain A mengeluarkan kartu K♠ dan menghabiskan seluruh kartunya
+  state = playCards(state, "user-a", ["K-spades"]);
+  assert.equal(state.players[0].finishRank, 1, "Pemain A harus selesai sebagai Juara 1");
+  assert.equal(state.currentTurnPlayerId, "user-b", "Giliran harus pindah ke Pemain B");
+  assert.notEqual(state.currentTablePlay, null, "Meja berisi kartu K♠ dari Pemain A");
+
+  // 2. Pemain B tidak membantai kartu A -> B memilih Lewat (Pass)
+  state = passTurn(state, "user-b");
+  assert.equal(state.currentTurnPlayerId, "user-c", "Giliran harus pindah ke Pemain C");
+
+  // 3. Pemain C juga tidak membantai kartu A -> C memilih Lewat (Pass)
+  state = passTurn(state, "user-c");
+
+  // Seluruh pemain aktif (B dan C) telah pass terhadap kartu A!
+  // Meja harus dikosongkan dan Pemain B (pemain setelah A) bebas mengeluarkan kartu apapun!
+  assert.equal(state.currentTablePlay, null, "Meja harus bersih (null)");
+  assert.equal(state.currentTurnPlayerId, "user-b", "Giliran bebas harus jatuh ke Pemain B (pemain setelah A)");
+  assert.equal(state.players[1].hasPassedThisTrick, false, "Status pass Pemain B harus sudah di-reset");
+
+  // Pemain B mencoba mengeluarkan kartu bebas (misal 4♥)
+  state = playCards(state, "user-b", ["4-hearts"]);
+  assert.equal(state.players[1].hand.length, 1, "Pemain B sukses mengeluarkan kartu pada giliran bebasnya");
+
+  console.log("✅ [PASS] Aturan Pemain A Habis Kartu, Semua Lawan Pass -> Pemain Setelah A Bebas Jalan");
 }
 
 console.log("\n🎉 SEMUA UNIT TEST BERHASIL 100% TANPA ERROR!");

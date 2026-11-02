@@ -79,7 +79,14 @@ export default function RulesModal({
                 <strong>Seri Sejenis (Minimal 3 Kartu):</strong> Urutan angka berurutan dengan <strong>lambang yang sama</strong> (misal <code className="text-emerald-300">3♠ 4♠ 5♠</code>). Bisa dilawan dengan jumlah kartu seri yang sama dan angka lebih tinggi meskipun beda lambang (misal dilawan <code className="text-rose-300">4♥ 5♥ 6♥</code>).
               </li>
               <li>
-                <strong>Full House (5 Kartu: 3 Kembar + 2 Buntut):</strong> Contoh <code className="text-amber-300">4-4-4 + 3-3</code>. Dilawan dengan Full House yang nilai 3 kartu kembarnya lebih tinggi.
+                <strong>Full House (5 Kartu):</strong> Terdiri dari 3 kartu kepala + 2 kartu kembar buntut. Bisa berupa:
+                <ul className="list-disc list-inside ml-4 mt-0.5 space-y-0.5 text-slate-300">
+                  <li><strong>Full House Klasik:</strong> 3 kartu kembar + 2 buntut (misal <code className="text-amber-300">4-4-4 + 3-3</code>).</li>
+                  <li><strong>Full House Seri Sejenis:</strong> 3 kartu seri sejenis + 2 buntut (misal <code className="text-amber-300">9♦ 10♦ J♦ + 5♥ 5♠</code>). Nilai penentunya adalah kartu tertinggi serinya (J).</li>
+                </ul>
+              </li>
+              <li>
+                <strong>Aturan Habis Kartu & Jalan Bebas:</strong> Jika pemain A menghabiskan seluruh kartunya dan seluruh pemain tidak ada yang membantai kartu terakhir tersebut (semua lawan lewat / Pass), maka meja dikosongkan dan <strong>pemain setelah A bebas mengeluarkan kartu/kombinasi apa saja</strong>.
               </li>
               <li>
                 <strong className="text-amber-300">Larangan Poker di Paling Akhir:</strong> Kartu <strong>Poker (angka 2)</strong> <u>TIDAK BOLEH</u> ditaruh atau disisakan di paling akhir sebagai kartu penutup! Kamu wajib mengeluarkan kartu Poker terlebih dahulu sebelum menghabiskan kartu terakhir.

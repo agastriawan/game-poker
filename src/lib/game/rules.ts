@@ -67,8 +67,12 @@ export function evaluateCombo(selectedCards: Card[]): PlayedCombo | null {
     };
   }
 
-  // 5. FULL HOUSE (5 Kartu: 3 Kembar + 2 Kembar Buntut, misal 4-4-4 + 3-3)
+  // 5. FULL HOUSE (5 Kartu)
+  // Bisa berupa:
+  // a) Full House Klasik: 3 Kartu Kembar + 2 Kartu Kembar Buntut (misal 4-4-4 + 3-3)
+  // b) Full House Seri Sejenis: 3 Kartu Seri Sejenis (Straight Flush) + 2 Kartu Kembar Buntut (misal 9♦-10♦-J♦ + 5♥-5♠)
   if (len === 5) {
+    // Bentuk A: Full House Klasik (3 kembar + 2 kembar)
     const counts = new Map<RankValue, Card[]>();
     for (const c of cards) {
       const list = counts.get(c.value) || [];
@@ -105,6 +109,43 @@ export function evaluateCombo(selectedCards: Card[]): PlayedCombo | null {
           length: 5,
           label: `Full House ${tripletLabel} (Buntut ${pairLabel})`,
         };
+      }
+    }
+
+    // Bentuk B: Full House Seri Sejenis + 2 Buntut (3 Seri Sejenis + 2 Kembar)
+    // Contoh: 9♦-10♦-J♦ + 5♥-5♠
+    for (let i = 0; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) {
+        if (cards[i].value === cards[j].value) {
+          const pairCards = [cards[i], cards[j]];
+          const remaining3 = cards.filter((_, idx) => idx !== i && idx !== j);
+
+          const sorted3 = sortHand(remaining3);
+          const firstSuit = sorted3[0].suit;
+          const allSameSuit = sorted3.every((c) => c.suit === firstSuit);
+          const hasPokerTwo = sorted3.some((c) => c.value === 15);
+
+          if (allSameSuit && !hasPokerTwo) {
+            const isConsecutive =
+              sorted3[1].value === sorted3[0].value + 1 &&
+              sorted3[2].value === sorted3[1].value + 1;
+
+            if (isConsecutive) {
+              const rankSeq = sorted3.map((c) => c.rank).join("-");
+              const suitSym = SUIT_SYMBOLS[firstSuit];
+              const pairRankLabel = pairCards[0].rank;
+              const orderedCards = [...sorted3, ...pairCards];
+
+              return {
+                type: "full_house",
+                cards: orderedCards,
+                primaryValue: sorted3[2].value, // Kartu tertinggi dalam seri 3 kartu tersebut
+                length: 5,
+                label: `Full House Seri ${rankSeq}${suitSym} (Buntut ${pairRankLabel})`,
+              };
+            }
+          }
+        }
       }
     }
   }
@@ -409,7 +450,7 @@ export function findAllValidPlays(
     }
   }
 
-  // 5. Semua Full House (3 Kembar + 2 Kembar Buntut)
+  // 5. Semua Full House (3 Kembar + 2 Buntut, ATAU 3 Seri Sejenis + 2 Buntut)
   if (!currentTable || currentTable.type === "full_house") {
     const triplets: Card[][] = [];
     const pairs: Card[][] = [];
@@ -423,10 +464,38 @@ export function findAllValidPlays(
       }
     }
 
+    // Bentuk A: Triplet + Pair
     for (const t of triplets) {
       for (const p of pairs) {
         if (t[0].value === p[0].value) continue;
         pushIfLegal(evaluateCombo([...t, ...p]));
+      }
+    }
+
+    // Bentuk B: 3 Seri Sejenis + Pair
+    const bySuit = new Map<string, Card[]>();
+    for (const c of sorted) {
+      if (c.value === 15) continue;
+      const arr = bySuit.get(c.suit) || [];
+      arr.push(c);
+      bySuit.set(c.suit, arr);
+    }
+
+    for (const [, suitCards] of bySuit.entries()) {
+      if (suitCards.length >= 3) {
+        for (let i = 0; i <= suitCards.length - 3; i++) {
+          const slice3 = suitCards.slice(i, i + 3);
+          if (
+            slice3[1].value === slice3[0].value + 1 &&
+            slice3[2].value === slice3[1].value + 1
+          ) {
+            const slice3Ids = new Set(slice3.map((c) => c.id));
+            for (const p of pairs) {
+              if (slice3Ids.has(p[0].id) || slice3Ids.has(p[1].id)) continue;
+              pushIfLegal(evaluateCombo([...slice3, ...p]));
+            }
+          }
+        }
       }
     }
   }
