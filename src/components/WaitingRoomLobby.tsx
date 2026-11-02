@@ -29,6 +29,7 @@ import {
 import { GameState, PlayerState, TauntEvent } from "@/lib/game/types";
 import { CHARACTER_PROFILES } from "./PlayerSeat3D";
 import OrientationToggleBtn from "./OrientationToggleBtn";
+import { soundEngine } from "@/lib/audio/sound-engine";
 
 const Model3DAvatar = dynamic(() => import("./Model3DAvatar"), {
   ssr: false,
@@ -97,6 +98,7 @@ export default function WaitingRoomLobby({
   const [editingName, setEditingName] = useState(myPlayer?.name || "");
   const [isEditingActive, setIsEditingActive] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
+  const [bgmVolume, setBgmVolume] = useState<number>(() => soundEngine.getBgmVolume());
 
   useEffect(() => {
     if (myPlayer?.name && !isEditingActive) {
@@ -244,6 +246,30 @@ export default function WaitingRoomLobby({
                 {bgmOn ? "AKTIF" : "OFF"}
               </span>
             </button>
+
+            {/* Pengatur Volume Musik (BGM) */}
+            {bgmOn && (
+              <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-300">
+                  <span className="flex items-center gap-1 text-amber-300">
+                    <Volume2 className="w-3 h-3" /> Volume Musik
+                  </span>
+                  <span className="text-amber-400">{Math.round(bgmVolume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(bgmVolume * 100)}
+                  onChange={(e) => {
+                    const val = Number(e.target.value) / 100;
+                    setBgmVolume(val);
+                    soundEngine.setBgmVolume(val);
+                  }}
+                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                />
+              </div>
+            )}
 
             {/* Toggle SFX */}
             <button

@@ -130,14 +130,14 @@ export default function PlayingCard({
         >
           {card.rank}
         </span>
-        <SuitSvg suit={card.suit} className={`${smallSuitSize} mt-0.2`} />
+        <SuitSvg suit={card.suit} className={`${smallSuitSize} mt-0.2 card-corner-suit`} />
       </div>
 
       {/* ARTWORK TENGAH KARTU (Absolute Center) */}
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-10">
         {isRoyal && !isCompactSize ? (
           <div className="relative flex flex-col items-center justify-center">
-            <span className="hidden sm:block text-[8px] sm:text-[9px] leading-none mb-0.5 drop-shadow-sm">
+            <span className="card-royal-crown hidden sm:block text-[8px] sm:text-[9px] leading-none mb-0.5 drop-shadow-sm">
               👑
             </span>
             <SuitSvg
@@ -151,7 +151,7 @@ export default function PlayingCard({
       </div>
 
       {/* POJOK KANAN BAWAH (Sama untuk Semua Kartu) */}
-      <div className="pointer-events-none absolute bottom-0.5 right-1 sm:bottom-1 sm:right-1 hidden sm:flex flex-col items-center leading-none rotate-180 z-10 opacity-85">
+      <div className="pointer-events-none absolute bottom-0.5 right-1 sm:bottom-1 sm:right-1 flex flex-col items-center leading-none rotate-180 z-10 opacity-85">
         <span
           className={[
             "font-black tracking-tighter leading-none",
@@ -161,7 +161,7 @@ export default function PlayingCard({
         >
           {card.rank}
         </span>
-        <SuitSvg suit={card.suit} className={`${smallSuitSize} mt-0.2`} />
+        <SuitSvg suit={card.suit} className={`${smallSuitSize} mt-0.2 card-corner-suit`} />
       </div>
     </button>
   );

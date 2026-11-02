@@ -303,6 +303,12 @@ body {
     border-radius: 8px !important;
   }
 
+  /* Hilangkan 2 lambang kecil di pojok kartu untuk mode handphone agar tidak menumpuk/menyatu dengan lambang tengah */
+  .card-corner-suit,
+  .card-royal-crown {
+    display: none !important;
+  }
+
   /* Posisi Tombol Aksi (Lewat, Banting Kartu, Batal) di HP: */
   /* Diangkat lebih ke atas (-56px) di ruang kosong meja agar TIDAK MENUTUPI kartu pemain */
   .action-buttons-bar {
@@ -332,4 +338,25 @@ body {
     height: 12px !important;
   }
 }
+
+/* =========================================================================
+   KHUSUS MAIN MENU MODE HP LANDSCAPE / FULLSCREEN (Tinggi <= 500px & Lebar < 1024px)
+   DESKTOP / LAPTOP TIDAK AKAN PERNAH TERPENGARUH SAMA SEKALI
+   ========================================================================= */
+@media screen and (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
+  .mobile-landscape-card {
+    max-width: 780px !important;
+  }
+  .mobile-landscape-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    space-y: 0 !important;
+  }
+  .mobile-landscape-col-right {
+    border-top: none !important;
+    padding-top: 0 !important;
+  }
+}
+
 

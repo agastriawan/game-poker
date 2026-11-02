@@ -8,7 +8,7 @@ interface OrientationToggleBtnProps {
   className?: string;
   showLabel?: boolean;
   size?: "sm" | "md";
-  variant?: "navbar" | "pill" | "floating";
+  variant?: "navbar" | "pill" | "floating" | "icon";
 }
 
 export default function OrientationToggleBtn({
@@ -117,6 +117,30 @@ export default function OrientationToggleBtn({
       : "p-2 sm:px-3 sm:py-2 text-xs";
   const iconClass =
     size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
+
+  if (variant === "icon") {
+    return (
+      <button
+        type="button"
+        onClick={handleToggle}
+        title={
+          isFullscreen
+            ? "Keluar dari Layar Penuh (Normal)"
+            : "Masuk ke Layar Penuh (Fullscreen)"
+        }
+        className={[
+          "w-10 h-10 rounded-2xl bg-slate-950/90 hover:bg-slate-900 border-2 border-amber-400/60 shadow-[0_6px_20px_rgba(0,0,0,0.8)] flex items-center justify-center text-amber-300 hover:text-white transition transform hover:scale-105 active:scale-95 shrink-0",
+          className,
+        ].join(" ")}
+      >
+        {isFullscreen ? (
+          <Minimize2 className="w-5 h-5 text-slate-300 hover:text-white" />
+        ) : (
+          <Maximize2 className="w-5 h-5 text-amber-300 animate-pulse" />
+        )}
+      </button>
+    );
+  }
 
   if (variant === "pill") {
     return (

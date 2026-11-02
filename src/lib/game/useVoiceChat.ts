@@ -123,7 +123,16 @@ export function useVoiceChat({
         audioEl = document.createElement("audio");
         audioEl.autoplay = true;
         audioEl.setAttribute("playsinline", "true");
-        audioEl.style.display = "none";
+        (audioEl as any).playsInline = true;
+        // PENTING: Gunakan position fixed offscreen, BUKAN display: none
+        // karena browser mobile/Chromium WebView mematikan decoding audio jika display: none!
+        audioEl.style.position = "fixed";
+        audioEl.style.left = "-9999px";
+        audioEl.style.top = "-9999px";
+        audioEl.style.width = "1px";
+        audioEl.style.height = "1px";
+        audioEl.style.opacity = "0";
+        audioEl.style.pointerEvents = "none";
         document.body.appendChild(audioEl);
         remoteAudioElsRef.current[peerId] = audioEl;
       }
@@ -131,9 +140,12 @@ export function useVoiceChat({
         audioEl.srcObject = stream;
       }
       audioEl.muted = !speakerEnabledRef.current;
-      audioEl.play().catch(() => {
-        // Autoplay might wait for next user gesture
-      });
+      audioEl.volume = 1.0;
+      if (speakerEnabledRef.current) {
+        audioEl.play().catch(() => {
+          // Autoplay dicegah browser HP, akan dibuka saat sentuhan layar
+        });
+      }
     },
     []
   );
@@ -149,10 +161,18 @@ export function useVoiceChat({
       pcsRef.current[peerId] = pc;
       pendingCandidatesRef.current[peerId] = [];
 
-      // Jika mic kita sudah aktif, pasang track audio ke koneksi ini
-      if (localStreamRef.current) {
-        for (const track of localStreamRef.current.getAudioTracks()) {
-          pc.addTrack(track, localStreamRef.current);
+      // Pastikan transceiver audio selalu siap menerima suara (Unified Plan)
+      const transceivers = pc.getTransceivers();
+      const hasAudio = transceivers.some((t) => t.receiver?.track?.kind === "audio");
+      if (!hasAudio) {
+        if (localStreamRef.current) {
+          for (const track of localStreamRef.current.getAudioTracks()) {
+            pc.addTrack(track, localStreamRef.current);
+          }
+        } else {
+          try {
+            pc.addTransceiver("audio", { direction: "recvonly" });
+          } catch {}
         }
       }
 
@@ -458,6 +478,46 @@ export function useVoiceChat({
     };
   }, []);
 
+  // Selalu sinkronkan speakerEnabled ke audio elements dan resume jika aktif
+  useEffect(() => {
+    speakerEnabledRef.current = speakerEnabled;
+    Object.values(remoteAudioElsRef.current).forEach((el) => {
+      el.muted = !speakerEnabled;
+      if (speakerEnabled && el.srcObject) {
+        el.play().catch(() => {});
+      }
+    });
+  }, [speakerEnabled]);
+
+  // Listener global untuk mengatasi Autoplay Policy di browser HP/WebView (Android Chrome/Capacitor)
+  // Memastikan audio lawan segera diputar saat pengguna menyentuh layar
+  useEffect(() => {
+    const unlockAllRemoteAudio = () => {
+      if (!speakerEnabledRef.current) return;
+      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+      Object.values(remoteAudioElsRef.current).forEach((el) => {
+        if (el.srcObject) {
+          el.muted = !speakerEnabledRef.current;
+          if (el.paused) {
+            el.play().catch(() => {});
+          }
+        }
+      });
+    };
+
+    window.addEventListener("touchstart", unlockAllRemoteAudio, { passive: true });
+    window.addEventListener("touchend", unlockAllRemoteAudio, { passive: true });
+    window.addEventListener("click", unlockAllRemoteAudio, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", unlockAllRemoteAudio);
+      window.removeEventListener("touchend", unlockAllRemoteAudio);
+      window.removeEventListener("click", unlockAllRemoteAudio);
+    };
+  }, []);
+
   const setupLocalVoiceDetector = useCallback(
     (stream: MediaStream) => {
       if (typeof window === "undefined") return;
@@ -617,7 +677,17 @@ export function useVoiceChat({
   ]);
 
   const toggleSpeaker = useCallback(() => {
-    setSpeakerEnabled((prev) => !prev);
+    setSpeakerEnabled((prev) => {
+      const next = !prev;
+      speakerEnabledRef.current = next;
+      Object.values(remoteAudioElsRef.current).forEach((el) => {
+        el.muted = !next;
+        if (next && el.srcObject) {
+          el.play().catch(() => {});
+        }
+      });
+      return next;
+    });
   }, []);
 
   return {

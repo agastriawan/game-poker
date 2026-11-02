@@ -174,6 +174,7 @@ export default function GameTable({
   });
   const [bgmOn, setBgmOn] = useState<boolean>(() => soundEngine.isBgmActive());
   const [sfxOn, setSfxOn] = useState<boolean>(() => soundEngine.isSfxActive());
+  const [bgmVolume, setBgmVolume] = useState<number>(() => soundEngine.getBgmVolume());
   const [visibleTaunts, setVisibleTaunts] = useState<Record<string, TauntEvent>>(
     {}
   );
@@ -211,6 +212,7 @@ export default function GameTable({
   useEffect(() => {
     setBgmOn(soundEngine.isBgmActive());
     setSfxOn(soundEngine.isSfxActive());
+    setBgmVolume(soundEngine.getBgmVolume());
   }, []);
 
   useEffect(() => {
@@ -1039,8 +1041,8 @@ export default function GameTable({
           {/* ================================================================= */}
       {/* FLOATING SINGLE SETTINGS BUTTON (PENGGANTI NAVBAR)                */}
       {/* ================================================================= */}
-      <div className="absolute right-3 z-40 flex items-center gap-1.5" style={{ top: "max(1.5rem, env(safe-area-inset-top))" }}>
-        <OrientationToggleBtn size="sm" />
+      <div className="absolute right-3 z-40 flex items-center gap-2" style={{ top: "max(1.5rem, env(safe-area-inset-top))" }}>
+        <OrientationToggleBtn variant="icon" />
         <button
           type="button"
           onClick={() => setIsSettingsOpen((prev) => !prev)}
@@ -1180,6 +1182,30 @@ export default function GameTable({
                         <span className="capitalize">{feltTheme}</span>
                       </button>
                     </div>
+
+                    {/* Pengatur Volume Musik (BGM) */}
+                    {bgmOn && (
+                      <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1 mt-1">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-300">
+                          <span className="flex items-center gap-1 text-amber-300">
+                            <Volume2 className="w-3 h-3" /> Volume Backsound
+                          </span>
+                          <span className="text-amber-400">{Math.round(bgmVolume * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={Math.round(bgmVolume * 100)}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) / 100;
+                            setBgmVolume(val);
+                            soundEngine.setBgmVolume(val);
+                          }}
+                          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                        />
+                      </div>
+                    )}
 
                     <div className="pt-1">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">

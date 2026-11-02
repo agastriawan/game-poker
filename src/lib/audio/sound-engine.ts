@@ -9,6 +9,7 @@ class SoundEngine {
   private ctx: AudioContext | null = null;
   private bgmEnabled: boolean = true;
   private sfxEnabled: boolean = true;
+  private bgmVolume: number = 0.18; // Default santai dan pelan (18%)
   private bgmAudio: HTMLAudioElement | null = null;
   private hasInteractionListener: boolean = false;
 
@@ -22,6 +23,13 @@ class SoundEngine {
         const savedSfx = localStorage.getItem("poker_barudak_sfx");
         if (savedSfx !== null) {
           this.sfxEnabled = savedSfx === "true";
+        }
+        const savedVol = localStorage.getItem("poker_barudak_bgm_volume");
+        if (savedVol !== null) {
+          const parsed = parseFloat(savedVol);
+          if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+            this.bgmVolume = parsed;
+          }
         }
       } catch {}
     }
@@ -77,12 +85,29 @@ class SoundEngine {
     return this.sfxEnabled;
   }
 
+  public getBgmVolume(): number {
+    return this.bgmVolume;
+  }
+
+  public setBgmVolume(volume: number): void {
+    const clamped = Math.max(0, Math.min(1, volume));
+    this.bgmVolume = clamped;
+    if (this.bgmAudio) {
+      this.bgmAudio.volume = clamped;
+    }
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("poker_barudak_bgm_volume", String(clamped));
+      } catch {}
+    }
+  }
+
   private initBgmAudio(): HTMLAudioElement | null {
     if (typeof window === "undefined") return null;
     if (!this.bgmAudio) {
       const audio = new Audio("/audio/bgm-poker.mp3");
       audio.loop = true;
-      audio.volume = 0.35;
+      audio.volume = this.bgmVolume;
       audio.preload = "auto";
       this.bgmAudio = audio;
     }
