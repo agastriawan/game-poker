@@ -201,6 +201,45 @@ export function useVoiceChat({
     []
   );
 
+  const updateAudioTrackOnPc = useCallback(
+    async (pc: RTCPeerConnection) => {
+      const hasLocalTrack = Boolean(
+        localStreamRef.current &&
+        localStreamRef.current.getAudioTracks().length > 0 &&
+        localStreamRef.current.getAudioTracks().some((t) => t.readyState === "live")
+      );
+      const localTrack = hasLocalTrack ? localStreamRef.current!.getAudioTracks()[0] : null;
+
+      const transceivers = pc.getTransceivers();
+      let audioTransceiver = transceivers.find(
+        (t) => t.receiver?.track?.kind === "audio" || t.sender?.track?.kind === "audio"
+      );
+
+      if (!audioTransceiver) {
+        if (localTrack && localStreamRef.current) {
+          audioTransceiver = pc.addTransceiver(localTrack, {
+            direction: "sendrecv",
+            streams: [localStreamRef.current],
+          });
+        } else {
+          audioTransceiver = pc.addTransceiver("audio", {
+            direction: "recvonly",
+          });
+        }
+      } else {
+        // PENTING: Perbarui direction transceiver!
+        // Jika mic aktif -> "sendrecv". Jika mic nonaktif -> "recvonly"
+        audioTransceiver.direction = localTrack ? "sendrecv" : "recvonly";
+        if (localTrack) {
+          if (audioTransceiver.sender.track !== localTrack) {
+            await audioTransceiver.sender.replaceTrack(localTrack);
+          }
+        }
+      }
+    },
+    []
+  );
+
   const getOrCreatePeerConnection = useCallback(
     (peerId: string): RTCPeerConnection => {
       const existing = pcsRef.current[peerId];
@@ -212,20 +251,7 @@ export function useVoiceChat({
       pcsRef.current[peerId] = pc;
       pendingCandidatesRef.current[peerId] = [];
 
-      // Pastikan transceiver audio selalu siap menerima suara (Unified Plan)
-      const transceivers = pc.getTransceivers();
-      const hasAudio = transceivers.some((t) => t.receiver?.track?.kind === "audio");
-      if (!hasAudio) {
-        if (localStreamRef.current) {
-          for (const track of localStreamRef.current.getAudioTracks()) {
-            pc.addTrack(track, localStreamRef.current);
-          }
-        } else {
-          try {
-            pc.addTransceiver("audio", { direction: "recvonly" });
-          } catch {}
-        }
-      }
+      updateAudioTrackOnPc(pc).catch(() => {});
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
@@ -239,22 +265,26 @@ export function useVoiceChat({
       };
 
       pc.ontrack = (event) => {
-        const [remoteStream] = event.streams;
-        if (remoteStream) {
-          attachRemoteStream(peerId, remoteStream);
-        } else {
-          const fallbackStream = new MediaStream([event.track]);
-          attachRemoteStream(peerId, fallbackStream);
-        }
+        console.log(`[VoiceChat] ontrack from ${peerId}`, event.track.id);
+        const stream = event.streams[0] || new MediaStream([event.track]);
+        attachRemoteStream(peerId, stream);
+
+        event.track.onunmute = () => {
+          console.log(`[VoiceChat] track onunmute from ${peerId}`);
+          const el = remoteAudioElsRef.current[peerId];
+          if (el && speakerEnabledRef.current) {
+            el.play().catch(() => {});
+          }
+        };
       };
 
       pc.oniceconnectionstatechange = () => {
+        console.log(`[VoiceChat] ICE state ${peerId}: ${pc.iceConnectionState}`);
         if (
           pc.iceConnectionState === "failed" ||
           pc.iceConnectionState === "disconnected"
         ) {
           try {
-            // Auto restart ICE jika jaringan berpindah (misal Wi-Fi ke data seluler)
             if (typeof (pc as any).restartIce === "function") {
               pc.restartIce();
             }
@@ -263,6 +293,7 @@ export function useVoiceChat({
       };
 
       pc.onconnectionstatechange = () => {
+        console.log(`[VoiceChat] Connection state ${peerId}: ${pc.connectionState}`);
         if (
           pc.connectionState === "failed" ||
           pc.connectionState === "closed"
@@ -276,7 +307,7 @@ export function useVoiceChat({
 
       return pc;
     },
-    [attachRemoteStream, myPlayerId, sendSignal]
+    [attachRemoteStream, myPlayerId, sendSignal, updateAudioTrackOnPc]
   );
 
   const initiateOfferToPeer = useCallback(
@@ -284,23 +315,7 @@ export function useVoiceChat({
       if (!peerId || peerId === myPlayerId) return;
       const pc = getOrCreatePeerConnection(peerId);
 
-      // Pastikan track lokal sudah terpasang bila mic aktif
-      if (localStreamRef.current) {
-        const senders = pc.getSenders();
-        for (const track of localStreamRef.current.getAudioTracks()) {
-          const alreadyAdded = senders.some((s) => s.track?.id === track.id);
-          if (!alreadyAdded) {
-            const audioSender = senders.find(
-              (s) => !s.track || s.track.kind === "audio"
-            );
-            if (audioSender) {
-              await audioSender.replaceTrack(track);
-            } else {
-              pc.addTrack(track, localStreamRef.current);
-            }
-          }
-        }
-      }
+      await updateAudioTrackOnPc(pc);
 
       try {
         makingOfferRef.current[peerId] = true;
@@ -317,13 +332,13 @@ export function useVoiceChat({
             sdp: pc.localDescription,
           });
         }
-      } catch {
-        // ignore offer collision
+      } catch (err) {
+        console.warn("[VoiceChat] initiateOffer error:", err);
       } finally {
         makingOfferRef.current[peerId] = false;
       }
     },
-    [getOrCreatePeerConnection, myPlayerId, sendSignal]
+    [getOrCreatePeerConnection, myPlayerId, sendSignal, updateAudioTrackOnPc]
   );
 
   // Setup Supabase Realtime Broadcast channel untuk signaling WebRTC
@@ -401,18 +416,8 @@ export function useVoiceChat({
               await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
             }
 
-            // Pastikan track lokal ikut terpasang bila mic kita aktif
-            if (localStreamRef.current) {
-              const senders = pc.getSenders();
-              for (const track of localStreamRef.current.getAudioTracks()) {
-                const alreadyAdded = senders.some(
-                  (s) => s.track?.id === track.id
-                );
-                if (!alreadyAdded) {
-                  pc.addTrack(track, localStreamRef.current);
-                }
-              }
-            }
+            // Pastikan track lokal ikut disinkronkan & direction diset ke sendrecv bila mic aktif
+            await updateAudioTrackOnPc(pc);
 
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
@@ -723,11 +728,13 @@ export function useVoiceChat({
         speaking: false,
       });
 
-      // Kirim offer ke semua pemain manusia lain di meja
+      // Update transceiver menjadi "sendrecv" dan kirim renegotiation offer ke semua peer
       const humanPeers = players.filter(
         (p) => !p.isBot && p.id !== myPlayerId
       );
       for (const peer of humanPeers) {
+        const pc = getOrCreatePeerConnection(peer.id);
+        await updateAudioTrackOnPc(pc);
         await initiateOfferToPeer(peer.id);
       }
     } catch {
