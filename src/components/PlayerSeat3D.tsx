@@ -99,7 +99,7 @@ export default function PlayerSeat3D({
   const avatarSizeClass = isMe
     ? "w-28 h-32 sm:w-32 sm:h-36 lg:w-36 lg:h-40 -mt-14 sm:-mt-18"
     : position === "top"
-    ? "w-36 h-42 sm:w-44 sm:h-50 lg:w-52 lg:h-58"
+    ? "w-28 h-32 sm:w-40 sm:h-46 lg:w-48 lg:h-54"
     : "w-36 h-40 sm:w-44 sm:h-48 lg:w-52 lg:h-56";
 
   const isTop = position === "top";

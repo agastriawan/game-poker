@@ -74,7 +74,7 @@ function PlayerTableSlot({
 
   if (!latestPlay) {
     return (
-      <div className="player-table-slot flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0">
+      <div className="player-table-slot relative z-30 flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0">
         {player.hasPassedThisTrick ? (
           <div className="px-2.5 py-0.5 rounded-full bg-slate-950/85 border border-rose-500/50 text-[9px] sm:text-[10px] font-black text-rose-300">
             PASS
@@ -87,7 +87,7 @@ function PlayerTableSlot({
   return (
     <div
       key={latestPlay.timestamp}
-      className="player-table-slot relative flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0 animate-card-throw"
+      className="player-table-slot relative z-30 flex flex-col items-center justify-center h-[46px] lg:h-[72px] w-[125px] sm:w-[190px] shrink-0 animate-card-throw"
     >
       {/* Deretan Kartu yang Dibuang pada Putaran Ini di Depan Meja Masing-Masing */}
       <div
@@ -1123,7 +1123,7 @@ export default function GameTable({
         {/* ZONA ATAS & TENGAH: KURSI LAWAN (KIRI, ATAS, KANAN) + MEJA OVAL 3D */}
         <div className="relative flex-1 min-h-0 flex flex-col items-center justify-center w-full">
           {/* KURSI LAWAN ATAS (KARAKTER 3D BESAR BERADA DI BELAKANG MEJA) */}
-          <div className="top-seat-container flex justify-center items-center shrink-0 pt-1 sm:pt-2 -mb-5 sm:-mb-7 lg:-mb-8 z-20">
+          <div className="top-seat-container flex justify-center items-center shrink-0 pt-0.5 sm:pt-1 -mb-1 sm:-mb-4 lg:-mb-6 z-10">
             {seatAssignments.top ? (
               <PlayerSeat3D
                 player={seatAssignments.top}
@@ -1203,11 +1203,14 @@ export default function GameTable({
             {/* ============================================================= */}
             {/* MEJA KASINO OVAL 3D PERSPEKTIF (UKURAN FIXED BESAR & STABIL)  */}
             {/* ============================================================= */}
-            <div className="perspective-stage w-full max-w-5xl mx-auto px-16 sm:px-20 lg:px-28">
+            <div className="perspective-stage w-full max-w-5xl mx-auto px-6 sm:px-16 lg:px-28">
               <div className="table-3d-rim w-full rounded-[85px] sm:rounded-[155px] p-1.5 sm:p-2.5 lg:p-3.5 border-2 border-amber-400/50">
                 <div
                   className={[
-                    "relative w-full h-[155px] lg:h-[250px] rounded-[75px] sm:rounded-[142px] border border-amber-300/40 flex flex-col items-center justify-center px-4 sm:px-10 py-1.5 lg:py-3 shadow-inner overflow-hidden",
+                    "relative w-full rounded-[75px] sm:rounded-[142px] border border-amber-300/40 flex flex-col items-center justify-center px-3 sm:px-10 py-1 sm:py-2 lg:py-3 shadow-inner",
+                    gameState.phase === "waiting"
+                      ? "min-h-[225px] sm:min-h-[245px] lg:h-[265px] overflow-visible"
+                      : "h-[155px] lg:h-[250px] overflow-hidden",
                     feltClass,
                   ].join(" ")}
                 >
@@ -1225,9 +1228,9 @@ export default function GameTable({
 
                   {/* 1. KONTEN MEJA SAAT WAITING (LOBBY MEJA) */}
                   {gameState.phase === "waiting" && (
-                    <div className="relative z-10 w-full max-w-md bg-slate-950/95 border border-amber-400/50 rounded-2xl p-2.5 sm:p-3.5 text-center space-y-2 shadow-2xl">
+                    <div className="relative z-10 w-full max-w-md bg-slate-950/95 border border-amber-400/50 rounded-2xl p-2 sm:p-3 text-center space-y-1.5 sm:space-y-2 shadow-2xl max-h-[85vh] overflow-y-auto">
                       {/* Baris Kode Room & Tombol Salin / Undang */}
-                      <div className="flex flex-wrap items-center justify-between gap-1.5 bg-slate-900/90 border border-amber-400/40 px-2.5 py-1.5 rounded-xl">
+                      <div className="flex items-center justify-between gap-1.5 bg-slate-900/90 border border-amber-400/40 px-2 sm:px-2.5 py-1 rounded-xl">
                         <div className="flex items-center gap-1.5 text-xs">
                           <span className="text-slate-400 font-semibold">Room:</span>
                           <span className="font-mono font-black text-amber-300 tracking-wider text-sm select-all">
@@ -1240,7 +1243,7 @@ export default function GameTable({
                             type="button"
                             onClick={handleCopyRoomCode}
                             title="Salin Kode Room Saja"
-                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-amber-400/30 text-amber-300 text-[10px] font-bold transition"
+                            className="flex items-center gap-1 px-2 py-0.5 sm:py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-amber-400/30 text-amber-300 text-[10px] font-bold transition"
                           >
                             {copiedCode ? (
                               <>
@@ -1259,7 +1262,7 @@ export default function GameTable({
                             type="button"
                             onClick={handleShareInvite}
                             title="Salin Link Meja (Teman klik langsung gabung)"
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-[10px] shadow transition"
+                            className="flex items-center gap-1 px-2.5 py-0.5 sm:py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-[10px] shadow transition"
                           >
                             {copiedLink ? (
                               <>
@@ -1277,7 +1280,7 @@ export default function GameTable({
                       </div>
 
                       {/* Header Pemain */}
-                      <div className="flex items-center justify-between px-1 text-[11px] text-slate-300">
+                      <div className="flex items-center justify-between px-1 text-[10px] sm:text-[11px] text-slate-300">
                         <div className="inline-flex items-center gap-1 font-bold text-amber-300">
                           <Users className="w-3 h-3" /> {gameState.players.length}/4 Pemain
                         </div>
@@ -1286,11 +1289,11 @@ export default function GameTable({
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-1.5 text-left">
+                      <div className="grid grid-cols-2 gap-1 text-left">
                         {gameState.players.map((p, i) => (
                           <div
                             key={p.id}
-                            className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px]"
+                            className="flex items-center justify-between px-2 py-0.5 sm:py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] sm:text-[11px]"
                           >
                             <span className="font-bold truncate flex items-center gap-1">
                               #{i + 1} {p.name}
@@ -1316,8 +1319,8 @@ export default function GameTable({
                       </div>
 
                       {/* Pengaturan Batas Waktu Giliran (20s, 30s, 40s, 50s, 60s, Unlimited) */}
-                      <div className="bg-slate-900/90 border border-amber-400/30 rounded-xl p-2 text-left space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
+                      <div className="bg-slate-900/90 border border-amber-400/30 rounded-xl p-1.5 sm:p-2 text-left space-y-1">
+                        <div className="flex items-center justify-between text-[10px] sm:text-xs">
                           <span className="flex items-center gap-1.5 font-bold text-amber-300">
                             <Clock className="w-3.5 h-3.5" /> Waktu Giliran:
                           </span>
@@ -1340,7 +1343,7 @@ export default function GameTable({
                                   disabled={isSubmitting}
                                   onClick={() => handleUpdateTurnLimit(dur)}
                                   className={[
-                                    "py-1 rounded-lg text-[10px] font-black transition border text-center",
+                                    "py-0.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-black transition border text-center",
                                     isSelected
                                       ? "bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold scale-105"
                                       : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
@@ -1367,7 +1370,7 @@ export default function GameTable({
                             <button
                               onClick={handleAddBot}
                               disabled={isSubmitting}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-400/40 text-[11px] font-bold text-amber-300 transition"
+                              className="flex items-center gap-1 px-3 py-1 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-400/40 text-[10px] sm:text-[11px] font-bold text-amber-300 transition shadow"
                             >
                               <UserPlus className="w-3 h-3" />+ Bot
                             </button>
@@ -1378,7 +1381,7 @@ export default function GameTable({
                             disabled={
                               gameState.players.length < 2 || isSubmitting
                             }
-                            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs shadow-lg transition"
+                            className="flex items-center gap-1.5 px-4 py-1 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs shadow-lg transition"
                           >
                             <Play className="w-3 h-3 fill-current" />
                             Mulai

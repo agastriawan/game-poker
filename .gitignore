@@ -18,6 +18,9 @@
 *.pem
 /*.mp3
 /*.png
+*.jpeg
+*.jpg
+WhatsApp Image*
 
 # debug
 npm-debug.log*
@@ -34,4 +37,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# capacitor
+/android/app/build/
+/android/.gradle/
+/android/captures/
+/ios/App/build/
+/ios/App/Pods/
+/ios/App/.build/
 

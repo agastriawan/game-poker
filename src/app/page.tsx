@@ -7,11 +7,13 @@ import {
   Bot,
   Clock,
   Dices,
+  Download,
   Loader2,
   LogIn,
   Music,
   Play,
   PlusCircle,
+  Smartphone,
   Users,
   Volume2,
   VolumeX,
@@ -20,6 +22,7 @@ import GameTable from "@/components/GameTable";
 import PlayingCard from "@/components/PlayingCard";
 import { CHARACTER_PROFILES } from "@/components/PlayerSeat3D";
 import RulesModal from "@/components/RulesModal";
+import DownloadModal from "@/components/DownloadModal";
 
 const Model3DAvatar = dynamic(() => import("@/components/Model3DAvatar"), {
   ssr: false,
@@ -67,6 +70,7 @@ export default function HomePage() {
   const [loadingLabel, setLoadingLabel] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
+  const [isDownloadOpen, setIsDownloadOpen] = useState<boolean>(false);
   const [selectedShowcaseIds, setSelectedShowcaseIds] = useState<string[]>([
     "3-spades",
     "2-spades",
@@ -453,6 +457,19 @@ export default function HomePage() {
 
           <button
             type="button"
+            onClick={() => {
+              soundEngine.playCardClick();
+              setIsDownloadOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/25 to-teal-500/25 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-400/60 text-xs font-black text-emerald-300 transition shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+            title="Unduh Aplikasi Android / Pasang di HP"
+          >
+            <Download className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+            <span>Unduh App</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsRulesOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-400/50 text-xs font-extrabold text-amber-300 transition shadow-lg"
           >
@@ -699,6 +716,27 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
+
+            {/* Strip Unduh Aplikasi Mobile */}
+            <div className="pt-2 sm:pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px]">
+                <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-slate-300 font-semibold">
+                  Main di HP lebih seru &amp; layar penuh!
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playCardClick();
+                  setIsDownloadOpen(true);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-[10px] sm:text-[11px] font-black transition flex items-center gap-1.5 shadow"
+              >
+                <Download className="w-3 h-3" />
+                <span>Unduh APK</span>
+              </button>
+            </div>
           </div>
         </div>
       </main>
@@ -844,6 +882,11 @@ export default function HomePage() {
         onClose={() => setIsRulesOpen(false)}
         shuffleMeta={null}
         supabaseReady={supabaseReady}
+      />
+
+      <DownloadModal
+        isOpen={isDownloadOpen}
+        onClose={() => setIsDownloadOpen(false)}
       />
     </div>
   );
