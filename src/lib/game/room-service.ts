@@ -128,7 +128,9 @@ export async function dispatchGameAction(
     | "timeout_turn"
     | "send_taunt"
     | "forfeit_game"
-    | "update_room_settings",
+    | "update_room_settings"
+    | "toggle_ready"
+    | "update_player_profile",
   currentState?: GameState,
   payload?: Record<string, unknown>
 ): Promise<GameState> {

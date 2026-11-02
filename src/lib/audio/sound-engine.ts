@@ -12,6 +12,21 @@ class SoundEngine {
   private bgmAudio: HTMLAudioElement | null = null;
   private hasInteractionListener: boolean = false;
 
+  constructor() {
+    if (typeof window !== "undefined") {
+      try {
+        const savedBgm = localStorage.getItem("poker_barudak_bgm");
+        if (savedBgm !== null) {
+          this.bgmEnabled = savedBgm === "true";
+        }
+        const savedSfx = localStorage.getItem("poker_barudak_sfx");
+        if (savedSfx !== null) {
+          this.sfxEnabled = savedSfx === "true";
+        }
+      } catch {}
+    }
+  }
+
   private ensureContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
     if (!this.ctx) {
@@ -39,6 +54,11 @@ class SoundEngine {
 
   public toggleBgm(): boolean {
     this.bgmEnabled = !this.bgmEnabled;
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("poker_barudak_bgm", String(this.bgmEnabled));
+      } catch {}
+    }
     if (this.bgmEnabled) {
       this.startBgm();
     } else {
@@ -49,6 +69,11 @@ class SoundEngine {
 
   public toggleSfx(): boolean {
     this.sfxEnabled = !this.sfxEnabled;
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("poker_barudak_sfx", String(this.sfxEnabled));
+      } catch {}
+    }
     return this.sfxEnabled;
   }
 

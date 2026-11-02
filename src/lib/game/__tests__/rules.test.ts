@@ -8,6 +8,8 @@ import {
   playCards,
   startNewRound,
   submitPlayerThrees,
+  togglePlayerReady,
+  updatePlayerProfile,
 } from "../engine";
 import {
   canBeatPlay,
@@ -199,6 +201,23 @@ console.log("=== Menjalankan Unit Test Aturan Game Poker Online ===");
   state = addPlayerToGame(state, { id: "p2", name: "Budi", isBot: false });
   state = addPlayerToGame(state, { id: "p3", name: "Cici", isBot: false });
   state = addPlayerToGame(state, { id: "p4", name: "Dedi", isBot: false });
+
+  // Uji ubah nama dan avatar di waiting room
+  state = updatePlayerProfile(state, "p2", { name: "Budi Pro", seatIndex: 2 });
+  assert.equal(state.players.find((p) => p.id === "p2")?.name, "Budi Pro");
+  assert.equal(state.players.find((p) => p.id === "p2")?.seatIndex, 2);
+
+  // Uji aturan: semua pemain harus Ready di waiting room sebelum start
+  assert.throws(
+    () => startNewRound(state),
+    /Semua pemain harus menekan Siap \(Ready\) dahulu!/
+  );
+
+  // Semua pemain menekan Siap (Ready)
+  for (const p of state.players) {
+    state = togglePlayerReady(state, p.id);
+  }
+  assert.equal(state.players.every((p) => p.isReady), true);
 
   state = startNewRound(state);
   assert.equal(state.phase, "collecting_threes");

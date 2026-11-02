@@ -36,6 +36,7 @@ import {
 import PlayingCard from "./PlayingCard";
 import PlayerSeat3D from "./PlayerSeat3D";
 import RulesModal from "./RulesModal";
+import WaitingRoomLobby from "./WaitingRoomLobby";
 import { soundEngine } from "@/lib/audio/sound-engine";
 import { getNextBotAction } from "@/lib/game/bot";
 import { TAUNT_PRESETS } from "@/lib/game/engine";
@@ -158,9 +159,19 @@ export default function GameTable({
   const [isTauntMenuOpen, setIsTauntMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
-  const [feltTheme, setFeltTheme] = useState<FeltTheme>("crimson");
-  const [bgmOn, setBgmOn] = useState<boolean>(true);
-  const [sfxOn, setSfxOn] = useState<boolean>(true);
+  const [feltTheme, setFeltTheme] = useState<FeltTheme>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("poker_barudak_theme") as FeltTheme | null;
+        if (saved && ["crimson", "emerald", "royal"].includes(saved)) {
+          return saved;
+        }
+      } catch {}
+    }
+    return "crimson";
+  });
+  const [bgmOn, setBgmOn] = useState<boolean>(() => soundEngine.isBgmActive());
+  const [sfxOn, setSfxOn] = useState<boolean>(() => soundEngine.isSfxActive());
   const [visibleTaunts, setVisibleTaunts] = useState<Record<string, TauntEvent>>(
     {}
   );
@@ -194,6 +205,11 @@ export default function GameTable({
     myPlayerId: myPlayer?.id || myPlayerId,
     players: gameState.players,
   });
+
+  useEffect(() => {
+    setBgmOn(soundEngine.isBgmActive());
+    setSfxOn(soundEngine.isSfxActive());
+  }, []);
 
   useEffect(() => {
     if (voice.micError) {
@@ -585,9 +601,15 @@ export default function GameTable({
   };
 
   const handleCycleTheme = () => {
-    setFeltTheme((prev) =>
-      prev === "crimson" ? "emerald" : prev === "emerald" ? "royal" : "crimson"
-    );
+    setFeltTheme((prev) => {
+      const next = prev === "crimson" ? "emerald" : prev === "emerald" ? "royal" : "crimson";
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("poker_barudak_theme", next);
+        } catch {}
+      }
+      return next;
+    });
   };
 
   const handleCopyRoomCode = () => {
@@ -713,7 +735,74 @@ export default function GameTable({
     }
   };
 
+  const handleSaveProfile = async (newName?: string, newAvatarIdx?: number) => {
+    if (!myPlayer) return;
+    const finalName =
+      (newName !== undefined ? newName : myPlayer.name).trim().slice(0, 15) ||
+      myPlayer.name;
+    const finalAvatarIdx =
+      typeof newAvatarIdx === "number" ? newAvatarIdx : myPlayer.seatIndex;
+
+    try {
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("poker_tongkrongan_player_name", finalName);
+          sessionStorage.setItem(
+            "poker_tongkrongan_avatar_idx",
+            String(finalAvatarIdx)
+          );
+        } catch {}
+      }
+      const next = await dispatchGameAction(
+        "update_player_profile",
+        gameState,
+        {
+          playerId: myPlayer.id,
+          name: finalName,
+          seatIndex: finalAvatarIdx,
+        }
+      );
+      onStateChange(next);
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal memperbarui profil."
+      );
+    }
+  };
+
+  const handleToggleReady = async () => {
+    if (!myPlayer || isSubmitting) return;
+    soundEngine.playCardClick();
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const next = await dispatchGameAction("toggle_ready", gameState, {
+        playerId: myPlayer.id,
+      });
+      onStateChange(next);
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal mengubah status Siap."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleStartRound = async () => {
+    if (!isHost || gameState.players.length < 2 || isSubmitting) return;
+    const unreadyPlayers = gameState.players.filter(
+      (p) => !p.isBot && !p.isReady
+    );
+    if (unreadyPlayers.length > 0) {
+      setErrorMsg(
+        `Semua pemain harus menekan Siap (Ready) dahulu! Belum siap: ${unreadyPlayers
+          .map((p) => p.name)
+          .join(", ")}`
+      );
+      return;
+    }
+
     if (!isHost || gameState.players.length < 2 || isSubmitting) return;
     soundEngine.startBgm();
     setIsSubmitting(true);
@@ -900,7 +989,36 @@ export default function GameTable({
           <div className="pointer-events-none fixed inset-0 z-50 animate-timer-critical-overlay border-4 border-rose-500/60" />
         )}
 
-      {/* ================================================================= */}
+      {gameState.phase === "waiting" ? (
+        <WaitingRoomLobby
+          gameState={gameState}
+          myPlayer={myPlayer}
+          isHost={isHost}
+          isSubmitting={isSubmitting}
+          voice={voice}
+          visibleTaunts={visibleTaunts}
+          onDismissTaunt={handleDismissMyTaunt}
+          onOpenChat={() => setIsTauntMenuOpen(true)}
+          onToggleReady={handleToggleReady}
+          onSaveProfile={handleSaveProfile}
+          onAddBot={handleAddBot}
+          onRemovePlayer={handleRemovePlayer}
+          onUpdateTurnLimit={handleUpdateTurnLimit}
+          onStartGame={handleStartRound}
+          onLeaveRoom={() => setIsLeaveConfirmOpen(true)}
+          onOpenRules={() => setIsRulesOpen(true)}
+          bgmOn={bgmOn}
+          onToggleBgm={handleToggleBgm}
+          sfxOn={sfxOn}
+          onToggleSfx={handleToggleSfx}
+          copiedCode={copiedCode}
+          copiedLink={copiedLink}
+          onCopyCode={handleCopyRoomCode}
+          onShareInvite={handleShareInvite}
+        />
+      ) : (
+        <>
+          {/* ================================================================= */}
       {/* FLOATING SINGLE SETTINGS BUTTON (PENGGANTI NAVBAR)                */}
       {/* ================================================================= */}
       <div className="absolute top-3 right-3 z-40">
@@ -1208,9 +1326,7 @@ export default function GameTable({
                 <div
                   className={[
                     "relative w-full rounded-[75px] sm:rounded-[142px] border border-amber-300/40 flex flex-col items-center justify-center px-3 sm:px-10 py-1 sm:py-2 lg:py-3 shadow-inner",
-                    gameState.phase === "waiting"
-                      ? "min-h-[225px] sm:min-h-[245px] lg:h-[265px] overflow-visible"
-                      : "h-[155px] lg:h-[250px] overflow-hidden",
+                    "h-[155px] lg:h-[250px] overflow-hidden",
                     feltClass,
                   ].join(" ")}
                 >
@@ -1225,177 +1341,6 @@ export default function GameTable({
                       className="h-16 sm:h-24 w-auto object-contain select-none"
                     />
                   </div>
-
-                  {/* 1. KONTEN MEJA SAAT WAITING (LOBBY MEJA) */}
-                  {gameState.phase === "waiting" && (
-                    <div className="relative z-10 w-full max-w-md bg-slate-950/95 border border-amber-400/50 rounded-2xl p-2 sm:p-3 text-center space-y-1.5 sm:space-y-2 shadow-2xl max-h-[85vh] overflow-y-auto">
-                      {/* Baris Kode Room & Tombol Salin / Undang */}
-                      <div className="flex items-center justify-between gap-1.5 bg-slate-900/90 border border-amber-400/40 px-2 sm:px-2.5 py-1 rounded-xl">
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <span className="text-slate-400 font-semibold">Room:</span>
-                          <span className="font-mono font-black text-amber-300 tracking-wider text-sm select-all">
-                            {gameState.roomCode}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1 ml-auto">
-                          <button
-                            type="button"
-                            onClick={handleCopyRoomCode}
-                            title="Salin Kode Room Saja"
-                            className="flex items-center gap-1 px-2 py-0.5 sm:py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-amber-400/30 text-amber-300 text-[10px] font-bold transition"
-                          >
-                            {copiedCode ? (
-                              <>
-                                <Check className="w-3 h-3 text-emerald-400" />
-                                <span className="text-emerald-300">Tersalin</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3" />
-                                <span>Salin Kode</span>
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleShareInvite}
-                            title="Salin Link Meja (Teman klik langsung gabung)"
-                            className="flex items-center gap-1 px-2.5 py-0.5 sm:py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-[10px] shadow transition"
-                          >
-                            {copiedLink ? (
-                              <>
-                                <Check className="w-3 h-3 text-white" />
-                                <span className="text-white">Link Tersalin!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Link2 className="w-3 h-3" />
-                                <span>Salin Link</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Header Pemain */}
-                      <div className="flex items-center justify-between px-1 text-[10px] sm:text-[11px] text-slate-300">
-                        <div className="inline-flex items-center gap-1 font-bold text-amber-300">
-                          <Users className="w-3 h-3" /> {gameState.players.length}/4 Pemain
-                        </div>
-                        <span className="text-[10px] text-emerald-400 font-medium">
-                          🔗 Teman klik link otomatis masuk
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-1 text-left">
-                        {gameState.players.map((p, i) => (
-                          <div
-                            key={p.id}
-                            className="flex items-center justify-between px-2 py-0.5 sm:py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] sm:text-[11px]"
-                          >
-                            <span className="font-bold truncate flex items-center gap-1">
-                              #{i + 1} {p.name}
-                              {p.id === gameState.hostId && (
-                                <span
-                                  title="Pembuat Room (Host)"
-                                  className="text-amber-400 text-[10px]"
-                                >
-                                  👑
-                                </span>
-                              )}
-                            </span>
-                            {isHost && p.id !== myPlayer?.id && (
-                              <button
-                                onClick={() => handleRemovePlayer(p.id)}
-                                className="text-slate-400 hover:text-rose-400"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Pengaturan Batas Waktu Giliran (20s, 30s, 40s, 50s, 60s, Unlimited) */}
-                      <div className="bg-slate-900/90 border border-amber-400/30 rounded-xl p-1.5 sm:p-2 text-left space-y-1">
-                        <div className="flex items-center justify-between text-[10px] sm:text-xs">
-                          <span className="flex items-center gap-1.5 font-bold text-amber-300">
-                            <Clock className="w-3.5 h-3.5" /> Waktu Giliran:
-                          </span>
-                          <span className="font-mono font-extrabold text-amber-200 text-xs">
-                            {(gameState.turnDurationLimit ?? 20) === 0
-                              ? "∞ Unlimited (Bebas)"
-                              : `${gameState.turnDurationLimit ?? 20} Detik`}
-                          </span>
-                        </div>
-
-                        {isHost ? (
-                          <div className="grid grid-cols-6 gap-1">
-                            {[20, 30, 40, 50, 60, 0].map((dur) => {
-                              const isSelected =
-                                (gameState.turnDurationLimit ?? 20) === dur;
-                              return (
-                                <button
-                                  key={dur}
-                                  type="button"
-                                  disabled={isSubmitting}
-                                  onClick={() => handleUpdateTurnLimit(dur)}
-                                  className={[
-                                    "py-0.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-black transition border text-center",
-                                    isSelected
-                                      ? "bg-amber-400 text-slate-950 border-amber-300 shadow-md font-extrabold scale-105"
-                                      : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700",
-                                  ].join(" ")}
-                                >
-                                  {dur === 0 ? "∞ Bebas" : `${dur}s`}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-slate-400 italic">
-                            ⏳ Diatur oleh Pembuat Room:{" "}
-                            {(gameState.turnDurationLimit ?? 20) === 0
-                              ? "Tanpa Batas Waktu (Unlimited)"
-                              : `${gameState.turnDurationLimit ?? 20} detik`}
-                          </div>
-                        )}
-                      </div>
-
-                      {isHost ? (
-                        <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">
-                          {gameState.players.length < 4 && (
-                            <button
-                              onClick={handleAddBot}
-                              disabled={isSubmitting}
-                              className="flex items-center gap-1 px-3 py-1 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-400/40 text-[10px] sm:text-[11px] font-bold text-amber-300 transition shadow"
-                            >
-                              <UserPlus className="w-3 h-3" />+ Bot
-                            </button>
-                          )}
-
-                          <button
-                            onClick={handleStartRound}
-                            disabled={
-                              gameState.players.length < 2 || isSubmitting
-                            }
-                            className="flex items-center gap-1.5 px-4 py-1 sm:py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs shadow-lg transition"
-                          >
-                            <Play className="w-3 h-3 fill-current" />
-                            Mulai
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="pt-0.5">
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-400/30 text-[11px] font-bold text-amber-300">
-                            ⏳ Menunggu pembuat room memulai...
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
                   {/* 2. KONTEN MEJA SAAT FASE KUMPUL ANGKA 3 */}
                   {gameState.phase === "collecting_threes" && (
@@ -1775,7 +1720,6 @@ export default function GameTable({
                       )}
 
                       {/* Kartu di Tangan Pemain */}
-                      {gameState.phase !== "waiting" && (
                         <div
                           className={[
                             "flex items-center justify-center flex-wrap pt-0.5 pb-0.5",
@@ -1799,7 +1743,6 @@ export default function GameTable({
                             );
                           })}
                         </div>
-                      )}
                     </div>
                   </div>
 
@@ -1886,6 +1829,8 @@ export default function GameTable({
           </div>
         )}
       </main>
+        </>
+      )}
 
       {/* Modal Konfirmasi Keluar / Menyerah */}
       {isLeaveConfirmOpen && (
@@ -1896,12 +1841,18 @@ export default function GameTable({
             </div>
             <div className="space-y-1.5">
               <h3 className="text-base font-black text-white">
-                Yakin Ingin Keluar dari Meja?
+                {gameState.phase === "waiting" ? "Yakin Ingin Keluar dari Ruangan?" : "Yakin Ingin Keluar dari Meja?"}
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Jika kamu keluar sekarang, kamu otomatis dinyatakan{" "}
-                <strong className="text-rose-400">KALAH (-10 pts)</strong> pada
-                permainan ini!
+                {gameState.phase === "waiting" ? (
+                "Kamu akan kembali ke menu utama."
+              ) : (
+                <>
+                  Jika kamu keluar sekarang, kamu otomatis dinyatakan{" "}
+                  <strong className="text-rose-400">KALAH (-10 pts)</strong> pada
+                  permainan ini!
+                </>
+              )}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2.5 pt-1">
@@ -1919,7 +1870,7 @@ export default function GameTable({
                 disabled={isSubmitting}
                 className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-xs font-black text-white shadow-lg transition"
               >
-                {isSubmitting ? "Keluar..." : "Ya, Keluar (Kalah)"}
+                {isSubmitting ? "Keluar..." : gameState.phase === "waiting" ? "Ya, Keluar" : "Ya, Keluar (Kalah)"}
               </button>
             </div>
           </div>

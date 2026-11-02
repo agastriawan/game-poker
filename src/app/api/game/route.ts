@@ -10,6 +10,8 @@ import {
   startNewRound,
   submitPlayerThrees,
   timeoutTurn,
+  togglePlayerReady,
+  updatePlayerProfile,
   updateRoomSettings,
 } from "@/lib/game/engine";
 import { GameState } from "@/lib/game/types";
@@ -30,7 +32,9 @@ export async function POST(req: NextRequest) {
         | "timeout_turn"
         | "send_taunt"
         | "forfeit_game"
-        | "update_room_settings";
+        | "update_room_settings"
+        | "toggle_ready"
+        | "update_player_profile";
       state?: GameState;
       payload?: Record<string, unknown>;
     };
@@ -60,6 +64,12 @@ export async function POST(req: NextRequest) {
             : 20;
 
         let tempState = createInitialGameState({ roomCode, hostId, hostName });
+        tempState = {
+          ...tempState,
+          players: tempState.players.map((p) =>
+            p.id === hostId ? { ...p, isReady: true } : p
+          ),
+        };
         tempState = updateRoomSettings(tempState, { turnDurationLimit });
 
         const botNames = ["Bot Himiya", "Bot Riko", "Bot Sari"];
@@ -149,6 +159,24 @@ export async function POST(req: NextRequest) {
           turnDurationLimit:
             payload?.turnDurationLimit !== undefined
               ? Number(payload.turnDurationLimit)
+              : undefined,
+        });
+        break;
+      }
+
+      case "toggle_ready": {
+        if (!state) throw new Error("State room tidak ditemukan.");
+        nextState = togglePlayerReady(state, String(payload?.playerId));
+        break;
+      }
+
+      case "update_player_profile": {
+        if (!state) throw new Error("State room tidak ditemukan.");
+        nextState = updatePlayerProfile(state, String(payload?.playerId), {
+          name: payload?.name !== undefined ? String(payload.name) : undefined,
+          seatIndex:
+            payload?.seatIndex !== undefined
+              ? Number(payload.seatIndex)
               : undefined,
         });
         break;

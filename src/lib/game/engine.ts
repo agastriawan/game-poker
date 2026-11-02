@@ -64,6 +64,7 @@ export function createInitialGameState(params: {
     collectedThrees: [],
     hasPassedThisTrick: false,
     finishRank: null,
+    isReady: false,
     totalScore: 0,
     lastRoundDelta: 0,
   };
@@ -118,6 +119,7 @@ export function addPlayerToGame(
     collectedThrees: [],
     hasPassedThisTrick: false,
     finishRank: null,
+    isReady: player.isBot ? true : false,
     totalScore: 0,
     lastRoundDelta: 0,
   };
@@ -182,6 +184,77 @@ export function updateRoomSettings(
 }
 
 /**
+ * Mengubah status Siap (Ready) pemain di waiting room.
+ */
+export function togglePlayerReady(
+  state: GameState,
+  playerId: string
+): GameState {
+  if (state.phase !== "waiting") return state;
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return state;
+
+  const nextReady = !player.isReady;
+  return {
+    ...state,
+    players: state.players.map((p) =>
+      p.id === playerId ? { ...p, isReady: nextReady } : p
+    ),
+    logs: [
+      ...(state.logs || []).slice(-19),
+      `${player.name} ${nextReady ? "telah SIAP! ✅" : "membatalkan Siap. ⏳"}`,
+    ],
+    updatedAt: Date.now(),
+  };
+}
+
+/**
+ * Memperbarui nama dan avatar pemain saat berada di waiting room.
+ */
+export function updatePlayerProfile(
+  state: GameState,
+  playerId: string,
+  params: { name?: string; seatIndex?: number }
+): GameState {
+  if (state.phase !== "waiting") return state;
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return state;
+
+  const cleanName =
+    params.name !== undefined ? params.name.trim().slice(0, 20) : player.name;
+  const newName = cleanName || player.name;
+  const newSeatIndex =
+    typeof params.seatIndex === "number" && params.seatIndex >= 0
+      ? params.seatIndex
+      : player.seatIndex;
+
+  const isNameChanged = newName !== player.name;
+  const isAvatarChanged = newSeatIndex !== player.seatIndex;
+
+  if (!isNameChanged && !isAvatarChanged) return state;
+
+  return {
+    ...state,
+    players: state.players.map((p) =>
+      p.id === playerId
+        ? {
+            ...p,
+            name: newName,
+            seatIndex: newSeatIndex,
+          }
+        : p
+    ),
+    logs: isNameChanged
+      ? [
+          ...(state.logs || []).slice(-19),
+          `${player.name} mengganti nama menjadi ${newName}.`,
+        ]
+      : state.logs,
+    updatedAt: Date.now(),
+  };
+}
+
+/**
  * Memulai ronde baru:
  * - Mengocok 52 kartu dengan CSPRNG + Riffle/Cut + Anti-Similarity Guard.
  * - Mengecek kondisi Kocok Ulang (Tidak punya J/Q/K atau 1 orang pegang 4 Poker).
@@ -197,6 +270,17 @@ export function startNewRound(
   }
   if (state.players.length < 2 || state.players.length > 4) {
     throw new Error("Permainan membutuhkan 2 hingga 4 pemain.");
+  }
+
+  // Di fase waiting room, semua pemain harus sudah menekan Siap (Ready)
+  if (state.phase === "waiting") {
+    const unreadyPlayers = state.players.filter((p) => !p.isBot && !p.isReady);
+    if (unreadyPlayers.length > 0) {
+      const names = unreadyPlayers.map((p) => p.name).join(", ");
+      throw new Error(
+        `Semua pemain harus menekan Siap (Ready) dahulu! Belum siap: ${names}`
+      );
+    }
   }
 
   const nextRoundNumber = state.roundNumber + 1;

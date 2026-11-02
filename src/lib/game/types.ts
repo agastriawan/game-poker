@@ -91,6 +91,8 @@ export interface PlayerState {
   finishRank: number | null;
   /** Apakah pemain menyerah / keluar di tengah permainan */
   isForfeited?: boolean;
+  /** Status Siap (Ready) pada fase waiting room sebelum game dimulai */
+  isReady?: boolean;
   /** Total poin akumulasi dari seluruh ronde */
   totalScore: number;
   /** Perubahan poin pada ronde terakhir */

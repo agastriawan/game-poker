@@ -78,8 +78,18 @@ export default function HomePage() {
   const [charBubbleText, setCharBubbleText] = useState<string>(
     CHARACTER_PROFILES[0].quote
   );
-  const [bgmOn, setBgmOn] = useState<boolean>(false);
-  const [sfxOn, setSfxOn] = useState<boolean>(true);
+  const [bgmOn, setBgmOn] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return soundEngine.isBgmActive();
+    }
+    return false;
+  });
+  const [sfxOn, setSfxOn] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return soundEngine.isSfxActive();
+    }
+    return true;
+  });
   const [botSetupPlayerCount, setBotSetupPlayerCount] = useState<2 | 3 | 4 | null>(null);
   const [botTurnLimit, setBotTurnLimit] = useState<number>(20);
 
@@ -88,6 +98,8 @@ export default function HomePage() {
   // Inisialisasi identitas pemain unik per tab browser
   useEffect(() => {
     if (typeof window === "undefined") return;
+    setBgmOn(soundEngine.isBgmActive());
+    setSfxOn(soundEngine.isSfxActive());
     let storedId = sessionStorage.getItem(SESSION_PLAYER_ID_KEY);
     if (!storedId) {
       const randBytes = new Uint8Array(4);
