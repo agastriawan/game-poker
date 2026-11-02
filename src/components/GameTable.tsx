@@ -1470,7 +1470,7 @@ export default function GameTable({
                       {/* ZONA TENGAH MEJA: HISTORI KIRI + STATUS TENGAH + HISTORI KANAN */}
                       <div className="w-full flex items-center justify-between gap-1 sm:gap-2 px-1 sm:px-3">
                         {/* Kiri: Histori Kartu Pemain Kiri */}
-                        <div className="flex-1 flex justify-start">
+                        <div className="table-cards-left flex-1 flex justify-start">
                           {seatAssignments.left && (
                             <PlayerTableSlot
                               player={seatAssignments.left}
@@ -1519,7 +1519,7 @@ export default function GameTable({
                         </div>
 
                         {/* Kanan: Histori Kartu Pemain Kanan */}
-                        <div className="flex-1 flex justify-end">
+                        <div className="table-cards-right flex-1 flex justify-end">
                           {seatAssignments.right && (
                             <PlayerTableSlot
                               player={seatAssignments.right}

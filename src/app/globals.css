@@ -236,6 +236,14 @@ body {
     height: 36px !important;
   }
 
+  /* Geser slot kartu lawan kiri & kanan ke dalam agar tidak tertutup avatar samping */
+  .table-cards-left {
+    padding-left: 2.5rem !important;
+  }
+  .table-cards-right {
+    padding-right: 2.5rem !important;
+  }
+
   /* Kurangi tinggi avatar lawan atas agar tidak memakan setengah layar HP */
   .top-seat-container {
     padding-top: 0 !important;
@@ -253,10 +261,12 @@ body {
     height: 82px !important;
   }
   .side-seat-left {
-    left: 2px !important;
+    left: -4px !important;
+    top: 22% !important;
   }
   .side-seat-right {
-    right: 2px !important;
+    right: -4px !important;
+    top: 22% !important;
   }
 
   /* Nameplate dan badge kartu lawan lebih compact di HP */
@@ -297,10 +307,9 @@ body {
   }
 
   /* Posisi Tombol Aksi (Lewat, Banting Kartu, Batal) di HP: */
-  /* Ditempatkan pas di sela antara dock kartu dan rim meja bawah (-top-10) */
-  /* sehingga kartu di tengah meja kasino TIDAK AKAN TERTUTUP LAGI! */
+  /* Diangkat lebih ke atas (-56px) di ruang kosong meja agar TIDAK MENUTUPI kartu pemain */
   .action-buttons-bar {
-    top: -40px !important;
+    top: -56px !important;
     padding: 2.5px 8px !important;
     border-radius: 12px !important;
     gap: 4px !important;

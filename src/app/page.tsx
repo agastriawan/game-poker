@@ -468,15 +468,15 @@ export default function HomePage() {
       <main className="relative z-10 max-w-6xl w-full mx-auto flex-1 min-h-0 flex items-center justify-center">
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-center">
           {/* KOLOM KIRI: PANGGUNG INTERAKTIF KARAKTER 3D & KARTU MEJA */}
-          <div className="lg:col-span-6 flex flex-col items-center justify-center space-y-3">
+          <div className="lg:col-span-6 flex flex-col items-center justify-center space-y-2 sm:space-y-3">
             {/* Panggung Meja Mini 3D + Karakter yang Bisa Diklik */}
-            <div className="perspective-stage w-full max-w-md">
-              <div className="table-3d-rim rounded-[60px] p-2.5 border-2 border-amber-400/50">
-                <div className="felt-crimson rounded-[50px] border border-amber-300/40 px-4 py-4 flex flex-col items-center justify-center space-y-3 shadow-inner relative">
+            <div className="perspective-stage w-full max-w-xs sm:max-w-md">
+              <div className="table-3d-rim rounded-[36px] sm:rounded-[60px] p-1.5 sm:p-2.5 border-2 border-amber-400/50">
+                <div className="felt-crimson rounded-[30px] sm:rounded-[50px] border border-amber-300/40 px-2 sm:px-4 py-2 sm:py-4 flex flex-col items-center justify-center space-y-1.5 sm:space-y-3 shadow-inner relative">
                   {/* Balon Dialog Interaktif Karakter */}
                   <div
                     key={charBubbleText}
-                    className="px-3.5 py-1 rounded-2xl bg-gradient-to-r from-white via-amber-50 to-amber-100 text-slate-950 border-2 border-amber-400 shadow-lg text-xs font-black text-center animate-taunt-pop"
+                    className="px-2.5 sm:px-3.5 py-0.5 sm:py-1 rounded-2xl bg-gradient-to-r from-white via-amber-50 to-amber-100 text-slate-950 border-2 border-amber-400 shadow-lg text-[10px] sm:text-xs font-black text-center animate-taunt-pop"
                   >
                     &ldquo;{charBubbleText}&rdquo;
                   </div>
@@ -490,10 +490,10 @@ export default function HomePage() {
                       )
                     }
                     title="Klik untuk ganti karakter 3D!"
-                    className="relative w-56 h-64 sm:w-64 sm:h-76 lg:w-72 lg:h-84 flex items-center justify-center transition transform hover:scale-105 cursor-pointer select-none group"
+                    className="relative w-32 h-36 sm:w-64 sm:h-76 lg:w-72 lg:h-84 flex items-center justify-center transition transform hover:scale-105 cursor-pointer select-none group"
                   >
                     {/* Bayangan Halus di Bawah Kaki Karakter (Tanpa Garis Lonjong Kaku) */}
-                    <div className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-32 sm:w-40 h-5 rounded-full bg-black/40 blur-md" />
+                    <div className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-24 sm:w-40 h-4 sm:h-5 rounded-full bg-black/40 blur-md" />
 
                     {activeProfile.modelPath ? (
                       <Model3DAvatar
@@ -502,27 +502,27 @@ export default function HomePage() {
                         autoRotate={true}
                         className="w-full h-full"
                         fallback={
-                          <div className="w-24 h-24 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-bold">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-bold">
                             {activeProfile.heroName}
                           </div>
                         }
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-bold">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-bold">
                         {activeProfile.title}
                       </div>
                     )}
                   </button>
 
                   {/* Selector 4 Karakter */}
-                  <div className="flex items-center justify-center gap-1.5">
+                  <div className="flex items-center justify-center gap-1 sm:gap-1.5">
                     {CHARACTER_PROFILES.map((prof, idx) => (
                       <button
                         key={prof.id}
                         type="button"
                         onClick={() => handleSelectAvatar(idx)}
                         className={[
-                          "px-2.5 py-1 rounded-full text-[10px] font-black transition border",
+                          "px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-black transition border",
                           avatarIdx === idx
                             ? "bg-amber-400 text-slate-950 border-white shadow scale-105"
                             : "bg-slate-950/80 text-slate-300 border-slate-700 hover:border-amber-400/50",
@@ -533,8 +533,8 @@ export default function HomePage() {
                     ))}
                   </div>
 
-                  {/* Barisan Kartu Interaktif */}
-                  <div className="pt-2 flex items-center justify-center gap-1.5 sm:gap-2">
+                  {/* Barisan Kartu Interaktif (Hanya tampil di tablet & desktop agar layar HP lega) */}
+                  <div className="hidden sm:flex pt-2 items-center justify-center gap-1.5 sm:gap-2">
                     {SHOWCASE_CARDS.map((card) => (
                       <PlayingCard
                         key={card.id}
@@ -551,26 +551,26 @@ export default function HomePage() {
           </div>
 
           {/* KOLOM KANAN: KONTROL MASUK PERMAINAN (MABAR & VS BOT) */}
-          <div className="lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-3xl p-4 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl space-y-4">
+          <div className="lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-2xl sm:rounded-3xl p-3 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl space-y-2.5 sm:space-y-4">
             {/* Input Nama Panggilan + Tombol Acak Nama */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-black uppercase tracking-wider text-amber-300">
+            <div className="space-y-1 sm:space-y-1.5">
+              <label className="block text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-300">
                 Nama Panggilan di Meja
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5 sm:gap-2">
                 <input
                   type="text"
                   maxLength={18}
                   value={playerName}
                   onChange={(e) => savePlayerName(e.target.value)}
                   placeholder="Masukkan nama kamu..."
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-white font-black text-sm"
+                  className="flex-1 px-3 py-1.5 sm:px-3.5 sm:py-2.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-white font-black text-xs sm:text-sm"
                 />
                 <button
                   type="button"
                   onClick={handleRandomNickname}
                   title="Acak Nama Keren"
-                  className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/40 text-amber-300 transition flex items-center gap-1 text-xs font-bold shrink-0"
+                  className="px-3 py-1.5 sm:px-3.5 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/40 text-amber-300 transition flex items-center gap-1 text-xs font-bold shrink-0"
                 >
                   <Dices className="w-4 h-4" />
                   <span className="hidden sm:inline">Acak</span>
@@ -579,18 +579,18 @@ export default function HomePage() {
             </div>
 
             {errorMsg && (
-              <div className="p-2.5 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs font-bold">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs font-bold">
                 ⚠️ {errorMsg}
               </div>
             )}
 
             {/* Opsi 1: Mabar Online Bersama Teman */}
-            <div className="space-y-2.5 pt-1">
+            <div className="space-y-1.5 sm:space-y-2.5 pt-0.5 sm:pt-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
-                  <Users className="w-4 h-4" /> Mabar Online Bersama Teman
+                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Mabar Online Bersama Teman
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
                   {supabaseReady ? "🟢 Realtime Online" : "🟡 Multi-Tab"}
                 </span>
               </div>
@@ -599,17 +599,17 @@ export default function HomePage() {
                 type="button"
                 onClick={handleCreateRoom}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm shadow-[0_6px_20px_rgba(245,158,11,0.3)] transition transform active:scale-95"
+                className="w-full flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm shadow-[0_6px_20px_rgba(245,158,11,0.3)] transition transform active:scale-95"
               >
                 {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                 ) : (
-                  <PlusCircle className="w-4 h-4" />
+                  <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 )}
                 Buat Room Mabar Baru (Dapatkan Kode)
               </button>
 
-              <form onSubmit={handleJoinRoom} className="flex gap-2">
+              <form onSubmit={handleJoinRoom} className="flex gap-1.5 sm:gap-2">
                 <input
                   type="text"
                   maxLength={8}
@@ -618,17 +618,17 @@ export default function HomePage() {
                     setJoinCodeInput(e.target.value.toUpperCase())
                   }
                   placeholder="KODE ROOM (Contoh: AB3X9K)"
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-emerald-400 focus:outline-none font-mono font-black uppercase tracking-widest text-xs sm:text-sm text-amber-300"
+                  className="flex-1 px-3 py-1.5 sm:px-3.5 sm:py-2.5 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-700 focus:border-emerald-400 focus:outline-none font-mono font-black uppercase tracking-widest text-xs sm:text-sm text-amber-300"
                 />
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm transition shrink-0 shadow-lg"
+                  className="flex items-center gap-1 px-4 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm transition shrink-0 shadow-lg"
                 >
                   {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                   ) : (
-                    <LogIn className="w-4 h-4" />
+                    <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   )}
                   Gabung
                 </button>
@@ -636,17 +636,17 @@ export default function HomePage() {
             </div>
 
             {/* Opsi 2: Langsung Main vs Bot 3D */}
-            <div className="border-t border-slate-800 pt-3.5 space-y-2.5">
+            <div className="border-t border-slate-800 pt-2 sm:pt-3.5 space-y-1.5 sm:space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                  <Bot className="w-4 h-4" /> Langsung Main vs Bot 3D
+                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Langsung Main vs Bot 3D
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
                   Pilih Aturan Giliran & Main
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -654,12 +654,12 @@ export default function HomePage() {
                     setBotSetupPlayerCount(4);
                   }}
                   disabled={loading}
-                  className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-amber-500/15 border border-slate-700 hover:border-amber-400 transition transform hover:-translate-y-0.5"
+                  className="group flex flex-col items-center justify-center p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-amber-500/15 border border-slate-700 hover:border-amber-400 transition transform hover:-translate-y-0.5"
                 >
-                  <span className="font-black text-xs sm:text-sm text-amber-300 group-hover:scale-105 transition">
+                  <span className="font-black text-[11px] sm:text-sm text-amber-300 group-hover:scale-105 transition">
                     🔥 4 Pemain
                   </span>
-                  <span className="text-[10px] text-slate-400 font-semibold">
+                  <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold">
                     13 Kartu / Org
                   </span>
                 </button>
@@ -671,12 +671,12 @@ export default function HomePage() {
                     setBotSetupPlayerCount(3);
                   }}
                   disabled={loading}
-                  className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-emerald-500/15 border border-slate-700 hover:border-emerald-400 transition transform hover:-translate-y-0.5"
+                  className="group flex flex-col items-center justify-center p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-emerald-500/15 border border-slate-700 hover:border-emerald-400 transition transform hover:-translate-y-0.5"
                 >
-                  <span className="font-black text-xs sm:text-sm text-emerald-300 group-hover:scale-105 transition">
+                  <span className="font-black text-[11px] sm:text-sm text-emerald-300 group-hover:scale-105 transition">
                     ⚡ 3 Pemain
                   </span>
-                  <span className="text-[10px] text-slate-400 font-semibold">
+                  <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold">
                     17–18 Kartu
                   </span>
                 </button>
@@ -688,12 +688,12 @@ export default function HomePage() {
                     setBotSetupPlayerCount(2);
                   }}
                   disabled={loading}
-                  className="group flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-900 hover:bg-sky-500/15 border border-slate-700 hover:border-sky-400 transition transform hover:-translate-y-0.5"
+                  className="group flex flex-col items-center justify-center p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-sky-500/15 border border-slate-700 hover:border-sky-400 transition transform hover:-translate-y-0.5"
                 >
-                  <span className="font-black text-xs sm:text-sm text-sky-300 group-hover:scale-105 transition">
+                  <span className="font-black text-[11px] sm:text-sm text-sky-300 group-hover:scale-105 transition">
                     ⚔️ Duel 1v1
                   </span>
-                  <span className="text-[10px] text-slate-400 font-semibold">
+                  <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold">
                     26 Kartu / Org
                   </span>
                 </button>
