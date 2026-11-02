@@ -12,6 +12,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     backgroundColor: "#090612",
+    appendUserAgent: "PokerBarudakApp",
   },
   plugins: {
     ScreenOrientation: {},

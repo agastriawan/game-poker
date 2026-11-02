@@ -138,21 +138,7 @@ export default function HomePage() {
 
     if (inviteParam) {
       setJoinCodeInput(inviteParam);
-      // Prioritaskan membuka aplikasi Android jika pengguna di Android dan sedang membuka lewat browser
-      if (typeof window !== "undefined" && typeof navigator !== "undefined") {
-        const isAndroid = /Android/i.test(navigator.userAgent);
-        const isNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
-        if (isAndroid && !isNative) {
-          const appIntentUrl = `intent://room/${inviteParam}#Intent;scheme=pokerbarudak;package=com.pokerbarudak.app;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
-          try {
-            window.location.href = appIntentUrl;
-          } catch (e) {
-            console.log("App intent launch error:", e);
-          }
-        }
-      }
-
-      // Bersihkan parameter dari URL agar rapi
+      // Bersihkan parameter dari URL agar rapi dan tidak memicu redirect berulang
       window.history.replaceState({}, "", window.location.pathname);
       const effectiveName =
         savedName || `Sobat ${storedId.slice(-3).toUpperCase()}`;

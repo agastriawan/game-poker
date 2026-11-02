@@ -76,14 +76,14 @@ export default function PlayingCard({
   const smallSuitSize = {
     xs: "w-1.5 h-1.5 sm:w-2 sm:h-2",
     sm: "w-2 h-2",
-    md: "w-2.5 h-2.5 sm:w-3 sm:h-3",
+    md: "w-2 h-2 sm:w-2.5 sm:h-2.5",
     lg: "w-3 h-3 sm:w-3.5 sm:h-3.5",
   }[size];
 
   const centerSuitSize = {
     xs: "w-3 h-3 sm:w-3.5 sm:h-3.5",
     sm: "w-4 h-4",
-    md: "w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7",
+    md: "w-3.5 h-3.5 sm:w-5 sm:h-5 lg:w-6 lg:h-6",
     lg: "w-6 h-6 sm:w-8 sm:h-8",
   }[size];
 
@@ -137,7 +137,7 @@ export default function PlayingCard({
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-10">
         {isRoyal && !isCompactSize ? (
           <div className="relative flex flex-col items-center justify-center">
-            <span className="text-[8px] sm:text-[9px] leading-none mb-0.5 drop-shadow-sm">
+            <span className="hidden sm:block text-[8px] sm:text-[9px] leading-none mb-0.5 drop-shadow-sm">
               👑
             </span>
             <SuitSvg
@@ -151,7 +151,7 @@ export default function PlayingCard({
       </div>
 
       {/* POJOK KANAN BAWAH (Sama untuk Semua Kartu) */}
-      <div className="pointer-events-none absolute bottom-0.5 right-1 sm:bottom-1 sm:right-1 flex flex-col items-center leading-none rotate-180 z-10 opacity-85">
+      <div className="pointer-events-none absolute bottom-0.5 right-1 sm:bottom-1 sm:right-1 hidden sm:flex flex-col items-center leading-none rotate-180 z-10 opacity-85">
         <span
           className={[
             "font-black tracking-tighter leading-none",

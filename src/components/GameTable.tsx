@@ -260,11 +260,21 @@ export default function GameTable({
     };
   }, []);
 
-  // Bersihkan pilihan kartu saat ronde atau giliran berubah
+  // Bersihkan pilihan kartu HANYA saat ronde baru dimulai atau fase permainan berubah
   useEffect(() => {
     setSelectedCardIds([]);
     setErrorMsg(null);
-  }, [gameState.roundNumber, gameState.phase, gameState.currentTurnPlayerId]);
+  }, [gameState.roundNumber, gameState.phase]);
+
+  // Jaga agar kartu yang sudah dipilih sebelumnya tetap ada jika masih di tangan
+  useEffect(() => {
+    if (!myPlayer) return;
+    const handCardIds = new Set(myPlayer.hand.map((c) => c.id));
+    setSelectedCardIds((prev) => {
+      const valid = prev.filter((id) => handCardIds.has(id));
+      return valid.length === prev.length ? prev : valid;
+    });
+  }, [myPlayer?.hand]);
 
   const gameStateRef = useRef<GameState>(gameState);
   useEffect(() => {
