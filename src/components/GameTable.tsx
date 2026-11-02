@@ -38,6 +38,7 @@ import PlayerSeat3D from "./PlayerSeat3D";
 import RulesModal from "./RulesModal";
 import WaitingRoomLobby from "./WaitingRoomLobby";
 import RotatePrompt from "./RotatePrompt";
+import OrientationToggleBtn from "./OrientationToggleBtn";
 import { soundEngine } from "@/lib/audio/sound-engine";
 import { getNextBotAction } from "@/lib/game/bot";
 import { TAUNT_PRESETS } from "@/lib/game/engine";
@@ -961,9 +962,13 @@ export default function GameTable({
   return (
     <div
       className={[
-        "ingame-landscape-stage relative flex flex-col justify-between casino-hall-bg text-white overflow-hidden select-none",
+        "ingame-landscape-stage relative flex flex-col justify-between casino-hall-bg text-white select-none",
+        gameState.phase === "waiting"
+          ? "h-dvh max-h-dvh overflow-y-auto overscroll-y-contain"
+          : "h-dvh max-h-dvh overflow-hidden",
         isBombShaking ? "animate-screen-bomb" : "",
       ].join(" ")}
+      style={{ WebkitOverflowScrolling: "touch" }}
     >
       <RotatePrompt />
 
@@ -1024,7 +1029,8 @@ export default function GameTable({
           {/* ================================================================= */}
       {/* FLOATING SINGLE SETTINGS BUTTON (PENGGANTI NAVBAR)                */}
       {/* ================================================================= */}
-      <div className="absolute top-3 right-3 z-40">
+      <div className="absolute right-3 z-40 flex items-center gap-1.5" style={{ top: "max(1.5rem, env(safe-area-inset-top))" }}>
+        <OrientationToggleBtn size="sm" />
         <button
           type="button"
           onClick={() => setIsSettingsOpen((prev) => !prev)}
@@ -1163,6 +1169,13 @@ export default function GameTable({
                         <Palette className="w-3 h-3 text-fuchsia-400" />
                         <span className="capitalize">{feltTheme}</span>
                       </button>
+                    </div>
+
+                    <div className="pt-1">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Orientasi Layar Handphone
+                      </div>
+                      <OrientationToggleBtn variant="pill" size="sm" className="w-full justify-center" />
                     </div>
                   </div>
                 </div>

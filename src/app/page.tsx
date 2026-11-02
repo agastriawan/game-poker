@@ -23,6 +23,7 @@ import PlayingCard from "@/components/PlayingCard";
 import { CHARACTER_PROFILES } from "@/components/PlayerSeat3D";
 import RulesModal from "@/components/RulesModal";
 import DownloadModal from "@/components/DownloadModal";
+import OrientationToggleBtn from "@/components/OrientationToggleBtn";
 
 const Model3DAvatar = dynamic(() => import("@/components/Model3DAvatar"), {
   ssr: false,
@@ -134,6 +135,20 @@ export default function HomePage() {
 
     if (inviteParam) {
       setJoinCodeInput(inviteParam);
+      // Prioritaskan membuka aplikasi Android jika pengguna di Android dan sedang membuka lewat browser
+      if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        const isNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
+        if (isAndroid && !isNative) {
+          const appIntentUrl = `intent://room/${inviteParam}#Intent;scheme=pokerbarudak;package=com.pokerbarudak.app;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
+          try {
+            window.location.href = appIntentUrl;
+          } catch (e) {
+            console.log("App intent launch error:", e);
+          }
+        }
+      }
+
       // Bersihkan parameter dari URL agar rapi
       window.history.replaceState({}, "", window.location.pathname);
       const effectiveName =
@@ -400,7 +415,7 @@ export default function HomePage() {
   const activeProfile = CHARACTER_PROFILES[avatarIdx];
 
   return (
-    <div className="relative h-dvh max-h-dvh w-full overflow-y-auto lg:overflow-hidden flex flex-col justify-between casino-hall-bg text-white px-3 sm:px-6 py-3 select-none">
+    <div className="relative h-dvh max-h-dvh w-full overflow-y-auto lg:overflow-hidden flex flex-col justify-between casino-hall-bg text-white px-3 sm:px-6 py-2 sm:py-3 select-none safe-top-inset">
       {/* Dekorasi Partikel Cahaya Kasino */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[550px] h-48 rounded-full bg-amber-500/15 blur-3xl" />
@@ -469,6 +484,9 @@ export default function HomePage() {
             <span className="hidden md:inline">SFX</span>
           </button>
 
+          {/* Mode Vertikal / Horizontal (Layar Penuh) */}
+          <OrientationToggleBtn />
+
           {/* Unduh App (Ikon di HP, Teks di Layar Luas) */}
           <button
             type="button"
@@ -500,9 +518,9 @@ export default function HomePage() {
       {/* TENGAH: PANGGUNG KARAKTER 3D INTERAKTIF & PANEL MASUK PERMAINAN   */}
       {/* ================================================================= */}
       <main className="relative z-10 max-w-6xl w-full mx-auto flex-1 min-h-0 flex items-center justify-center">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-center">
+        <div className="w-full grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 items-center">
           {/* KOLOM KIRI: PANGGUNG INTERAKTIF KARAKTER 3D & KARTU MEJA */}
-          <div className="lg:col-span-6 flex flex-col items-center justify-center space-y-2 sm:space-y-3">
+          <div className="sm:col-span-5 lg:col-span-6 flex flex-col items-center justify-center space-y-1.5 sm:space-y-2">
             {/* Panggung Meja Mini 3D + Karakter yang Bisa Diklik */}
             <div className="perspective-stage w-full max-w-xs sm:max-w-md">
               <div className="table-3d-rim rounded-[36px] sm:rounded-[60px] p-1.5 sm:p-2.5 border-2 border-amber-400/50">
@@ -524,7 +542,7 @@ export default function HomePage() {
                       )
                     }
                     title="Klik untuk ganti karakter 3D!"
-                    className="relative w-28 h-32 sm:w-64 sm:h-76 lg:w-72 lg:h-84 flex items-center justify-center transition transform hover:scale-105 cursor-pointer select-none group"
+                    className="relative w-28 h-32 sm:w-44 sm:h-48 lg:w-72 lg:h-84 flex items-center justify-center transition transform hover:scale-105 cursor-pointer select-none group"
                   >
                     {/* Bayangan Halus di Bawah Kaki Karakter (Tanpa Garis Lonjong Kaku) */}
                     <div className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-24 sm:w-40 h-4 sm:h-5 rounded-full bg-black/40 blur-md" />
@@ -568,7 +586,7 @@ export default function HomePage() {
                   </div>
 
                   {/* Barisan Kartu Interaktif (Hanya tampil di tablet & desktop agar layar HP lega) */}
-                  <div className="hidden sm:flex pt-2 items-center justify-center gap-1.5 sm:gap-2">
+                  <div className="hidden lg:flex pt-2 items-center justify-center gap-1.5 sm:gap-2">
                     {SHOWCASE_CARDS.map((card) => (
                       <PlayingCard
                         key={card.id}
@@ -585,7 +603,7 @@ export default function HomePage() {
           </div>
 
           {/* KOLOM KANAN: KONTROL MASUK PERMAINAN (MABAR & VS BOT) */}
-          <div className="lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-2xl sm:rounded-3xl p-3 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl space-y-2.5 sm:space-y-4">
+          <div className="sm:col-span-7 lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-2xl sm:rounded-3xl p-2.5 sm:p-3.5 lg:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl space-y-2 sm:space-y-3">
             {/* Input Nama Panggilan + Tombol Acak Nama */}
             <div className="space-y-1 sm:space-y-1.5">
               <label className="block text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-300">
@@ -742,7 +760,9 @@ export default function HomePage() {
                   Main di HP lebih seru &amp; layar penuh!
                 </span>
               </div>
-              <button
+              <div className="flex items-center gap-1.5">
+                <OrientationToggleBtn variant="pill" size="sm" />
+                <button
                 type="button"
                 onClick={() => {
                   soundEngine.playCardClick();
@@ -752,7 +772,8 @@ export default function HomePage() {
               >
                 <Download className="w-3 h-3" />
                 <span>Unduh APK</span>
-              </button>
+                </button>
+              </div>
             </div>
           </div>
         </div>

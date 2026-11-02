@@ -26,6 +26,7 @@ body {
   background-position: center center;
   background-size: cover;
   background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .perspective-stage {
@@ -183,6 +184,17 @@ body {
 .ingame-landscape-stage {
   width: 100%;
   min-height: 100dvh;
+}
+
+/* Safe area padding untuk notch dan status bar handphone */
+.safe-top-inset {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+@media screen and (max-height: 500px) {
+  .safe-top-inset {
+    padding-top: max(1.75rem, env(safe-area-inset-top));
+  }
 }
 
 /* =========================================================================

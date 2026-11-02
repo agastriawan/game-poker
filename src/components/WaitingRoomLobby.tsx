@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { GameState, PlayerState, TauntEvent } from "@/lib/game/types";
 import { CHARACTER_PROFILES } from "./PlayerSeat3D";
+import OrientationToggleBtn from "./OrientationToggleBtn";
 
 const Model3DAvatar = dynamic(() => import("./Model3DAvatar"), {
   ssr: false,
@@ -107,7 +108,7 @@ export default function WaitingRoomLobby({
   const canStart = gameState.players.length >= 2 && allHumansReady;
 
   return (
-    <div className="relative z-30 w-full h-full min-h-screen flex flex-col justify-between overflow-y-auto overflow-x-hidden p-1.5 sm:p-3 lg:p-4 text-white max-w-7xl mx-auto select-none">
+    <div className="relative z-30 w-full min-h-full flex flex-col justify-between p-1.5 sm:p-3 lg:p-4 text-white max-w-7xl mx-auto select-none pb-14 sm:pb-6 safe-top-inset">
       {/* ================================================================= */}
       {/* 1. TOP BAR: LOGO POKER BARUDAK, ROOM, SUARA, ATURAN & KELUAR      */}
       {/* ================================================================= */}
@@ -212,6 +213,9 @@ export default function WaitingRoomLobby({
             )}
             <span className="hidden md:inline">{sfxOn ? "SFX On" : "SFX Off"}</span>
           </button>
+
+          {/* Mode Vertikal / Horizontal (Layar Penuh) */}
+          <OrientationToggleBtn size="sm" />
 
           {/* Panduan Aturan */}
           <button
