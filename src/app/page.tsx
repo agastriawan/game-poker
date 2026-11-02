@@ -651,177 +651,185 @@ export default function HomePage() {
           </div>
 
           {/* KOLOM KANAN: KONTROL MASUK PERMAINAN (MABAR & VS BOT) */}
-          <div className="w-full max-w-md lg:max-w-none lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-2xl sm:rounded-3xl p-3 sm:p-5 lg:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl space-y-2.5 sm:space-y-3.5">
-            {/* Input Nama Panggilan + Tombol Acak Nama */}
-            <div className="space-y-1 sm:space-y-1.5">
-              <label className="block text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-300">
-                Nama Panggilan di Meja
-              </label>
-              <div className="flex gap-1.5 sm:gap-2">
-                <input
-                  type="text"
-                  maxLength={18}
-                  value={playerName}
-                  onChange={(e) => savePlayerName(e.target.value)}
-                  placeholder="Masukkan nama kamu..."
-                  className="flex-1 px-3 py-1.5 sm:px-3.5 sm:py-2.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-white font-black text-xs sm:text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={handleRandomNickname}
-                  title="Acak Nama Keren"
-                  className="px-3 py-1.5 sm:px-3.5 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/40 text-amber-300 transition flex items-center gap-1 text-xs font-bold shrink-0"
-                >
-                  <Dices className="w-4 h-4" />
-                  <span className="hidden sm:inline">Acak</span>
-                </button>
-              </div>
-            </div>
-
+          <div className="w-full max-w-md landscape:max-w-3xl lg:max-w-none lg:col-span-6 bg-slate-950/90 border-2 border-amber-400/40 rounded-2xl sm:rounded-3xl p-3 sm:p-5 lg:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl">
             {errorMsg && (
-              <div className="p-2 sm:p-2.5 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs font-bold">
+              <div className="mb-2 sm:mb-2.5 p-2 sm:p-2.5 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs font-bold">
                 ⚠️ {errorMsg}
               </div>
             )}
 
-            {/* Opsi 1: Mabar Online Bersama Teman */}
-            <div className="space-y-1.5 sm:space-y-2.5 pt-0.5 sm:pt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Mabar Online Bersama Teman
-                </span>
-                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
-                  {supabaseReady ? "🟢 Realtime Online" : "🟡 Multi-Tab"}
-                </span>
+            <div className="grid grid-cols-1 landscape:grid-cols-2 lg:grid-cols-1 gap-2.5 sm:gap-4">
+              {/* Kolom 1 (Kiri di mode landscape HP): Profil Nama & Mabar Online */}
+              <div className="space-y-2 sm:space-y-2.5 flex flex-col justify-between">
+                {/* Input Nama Panggilan + Tombol Acak Nama */}
+                <div className="space-y-1 sm:space-y-1.5">
+                  <label className="block text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-300">
+                    Nama Panggilan di Meja
+                  </label>
+                  <div className="flex gap-1.5 sm:gap-2">
+                    <input
+                      type="text"
+                      maxLength={18}
+                      value={playerName}
+                      onChange={(e) => savePlayerName(e.target.value)}
+                      placeholder="Masukkan nama kamu..."
+                      className="flex-1 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none text-white font-black text-xs sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRandomNickname}
+                      title="Acak Nama Keren"
+                      className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/40 text-amber-300 transition flex items-center gap-1 text-xs font-bold shrink-0"
+                    >
+                      <Dices className="w-4 h-4" />
+                      <span className="hidden sm:inline">Acak</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Opsi 1: Mabar Online Bersama Teman */}
+                <div className="space-y-1.5 sm:space-y-2 pt-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Mabar Online Bersama Teman
+                    </span>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
+                      {supabaseReady ? "🟢 Realtime Online" : "🟡 Multi-Tab"}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCreateRoom}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm shadow-[0_6px_20px_rgba(245,158,11,0.3)] transition transform active:scale-95"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                    ) : (
+                      <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    )}
+                    Buat Room Mabar Baru (Dapatkan Kode)
+                  </button>
+
+                  <form onSubmit={handleJoinRoom} className="flex gap-1.5 sm:gap-2">
+                    <input
+                      type="text"
+                      maxLength={8}
+                      value={joinCodeInput}
+                      onChange={(e) =>
+                        setJoinCodeInput(e.target.value.toUpperCase())
+                      }
+                      placeholder="KODE ROOM (Contoh: AB3X9K)"
+                      className="flex-1 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-700 focus:border-emerald-400 focus:outline-none font-mono font-black uppercase tracking-widest text-xs sm:text-sm text-amber-300"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex items-center gap-1 px-4 py-1.5 sm:px-5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm transition shrink-0 shadow-lg"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                      ) : (
+                        <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      )}
+                      Gabung
+                    </button>
+                  </form>
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleCreateRoom}
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm shadow-[0_6px_20px_rgba(245,158,11,0.3)] transition transform active:scale-95"
-              >
-                {loading ? (
-                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                ) : (
-                  <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                )}
-                Buat Room Mabar Baru (Dapatkan Kode)
-              </button>
+              {/* Kolom 2 (Kanan di mode landscape HP): Main vs Bot 3D & Strip APK */}
+              <div className="space-y-2 sm:space-y-2.5 border-t landscape:border-t-0 lg:border-t border-slate-800 pt-2 landscape:pt-0 lg:pt-2.5 flex flex-col justify-between">
+                {/* Opsi 2: Langsung Main vs Bot 3D */}
+                <div className="space-y-1.5 sm:space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                      <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Langsung Main vs Bot 3D
+                    </span>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
+                      Pilih Aturan Giliran &amp; Main
+                    </span>
+                  </div>
 
-              <form onSubmit={handleJoinRoom} className="flex gap-1.5 sm:gap-2">
-                <input
-                  type="text"
-                  maxLength={8}
-                  value={joinCodeInput}
-                  onChange={(e) =>
-                    setJoinCodeInput(e.target.value.toUpperCase())
-                  }
-                  placeholder="KODE ROOM (Contoh: AB3X9K)"
-                  className="flex-1 px-3 py-1.5 sm:px-3.5 sm:py-2.5 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-700 focus:border-emerald-400 focus:outline-none font-mono font-black uppercase tracking-widest text-xs sm:text-sm text-amber-300"
-                />
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex items-center gap-1 px-4 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-60 text-slate-950 font-black text-xs sm:text-sm transition shrink-0 shadow-lg"
-                >
-                  {loading ? (
-                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                  ) : (
-                    <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  )}
-                  Gabung
-                </button>
-              </form>
-            </div>
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playCardClick();
+                        setBotSetupPlayerCount(4);
+                      }}
+                      disabled={loading}
+                      className="group flex flex-col items-center justify-center p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-amber-500/15 border border-slate-700 hover:border-amber-400 transition transform hover:-translate-y-0.5"
+                    >
+                      <span className="font-black text-[11px] sm:text-xs text-amber-300 group-hover:scale-105 transition">
+                        🔥 4 Pemain
+                      </span>
+                      <span className="text-[8px] sm:text-[9px] text-slate-400 font-semibold">
+                        13 Kartu / Org
+                      </span>
+                    </button>
 
-            {/* Opsi 2: Langsung Main vs Bot 3D */}
-            <div className="border-t border-slate-800 pt-2 sm:pt-3.5 space-y-1.5 sm:space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Langsung Main vs Bot 3D
-                </span>
-                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
-                  Pilih Aturan Giliran & Main
-                </span>
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playCardClick();
+                        setBotSetupPlayerCount(3);
+                      }}
+                      disabled={loading}
+                      className="group flex flex-col items-center justify-center p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-emerald-500/15 border border-slate-700 hover:border-emerald-400 transition transform hover:-translate-y-0.5"
+                    >
+                      <span className="font-black text-[11px] sm:text-xs text-emerald-300 group-hover:scale-105 transition">
+                        ⚡ 3 Pemain
+                      </span>
+                      <span className="text-[8px] sm:text-[9px] text-slate-400 font-semibold">
+                        17–18 Kartu
+                      </span>
+                    </button>
 
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playCardClick();
-                    setBotSetupPlayerCount(4);
-                  }}
-                  disabled={loading}
-                  className="group flex flex-col items-center justify-center p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-amber-500/15 border border-slate-700 hover:border-amber-400 transition transform hover:-translate-y-0.5"
-                >
-                  <span className="font-black text-[11px] sm:text-sm text-amber-300 group-hover:scale-105 transition">
-                    🔥 4 Pemain
-                  </span>
-                  <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold">
-                    13 Kartu / Org
-                  </span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playCardClick();
+                        setBotSetupPlayerCount(2);
+                      }}
+                      disabled={loading}
+                      className="group flex flex-col items-center justify-center p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-sky-500/15 border border-slate-700 hover:border-sky-400 transition transform hover:-translate-y-0.5"
+                    >
+                      <span className="font-black text-[11px] sm:text-xs text-sky-300 group-hover:scale-105 transition">
+                        ⚔️ Duel 1v1
+                      </span>
+                      <span className="text-[8px] sm:text-[9px] text-slate-400 font-semibold">
+                        26 Kartu / Org
+                      </span>
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playCardClick();
-                    setBotSetupPlayerCount(3);
-                  }}
-                  disabled={loading}
-                  className="group flex flex-col items-center justify-center p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-emerald-500/15 border border-slate-700 hover:border-emerald-400 transition transform hover:-translate-y-0.5"
-                >
-                  <span className="font-black text-[11px] sm:text-sm text-emerald-300 group-hover:scale-105 transition">
-                    ⚡ 3 Pemain
-                  </span>
-                  <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold">
-                    17–18 Kartu
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playCardClick();
-                    setBotSetupPlayerCount(2);
-                  }}
-                  disabled={loading}
-                  className="group flex flex-col items-center justify-center p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-sky-500/15 border border-slate-700 hover:border-sky-400 transition transform hover:-translate-y-0.5"
-                >
-                  <span className="font-black text-[11px] sm:text-sm text-sky-300 group-hover:scale-105 transition">
-                    ⚔️ Duel 1v1
-                  </span>
-                  <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold">
-                    26 Kartu / Org
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Strip Unduh Aplikasi Mobile */}
-            <div className="pt-2 sm:pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px]">
-                <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-slate-300 font-semibold">
-                  Main di HP lebih seru &amp; layar penuh!
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <OrientationToggleBtn variant="pill" size="sm" showLabel={false} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playCardClick();
-                    setIsDownloadOpen(true);
-                  }}
-                  title="Unduh Aplikasi Android (APK)"
-                  className="p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-[10px] sm:text-[11px] font-black transition flex items-center gap-1 shadow"
-                >
-                  <Download className="w-3 h-3 text-emerald-400" />
-                  <span className="hidden sm:inline">Unduh APK</span>
-                </button>
+                {/* Strip Unduh Aplikasi Mobile */}
+                <div className="pt-1.5 sm:pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px]">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-slate-300 font-semibold">
+                      Main di HP lebih seru &amp; layar penuh!
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <OrientationToggleBtn variant="pill" size="sm" showLabel={false} />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playCardClick();
+                        setIsDownloadOpen(true);
+                      }}
+                      title="Unduh Aplikasi Android (APK)"
+                      className="p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-[10px] sm:text-[11px] font-black transition flex items-center gap-1 shadow"
+                    >
+                      <Download className="w-3 h-3 text-emerald-400" />
+                      <span className="hidden sm:inline">Unduh APK</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -858,7 +866,7 @@ export default function HomePage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-slate-950 border-2 border-amber-400 rounded-3xl p-5 shadow-[0_25px_60px_rgba(0,0,0,0.95)] space-y-4 animate-taunt-pop"
+            className="w-full max-w-md landscape:max-w-lg bg-slate-950 border-2 border-amber-400 rounded-2xl sm:rounded-3xl p-3 sm:p-5 landscape:p-3 shadow-[0_25px_60px_rgba(0,0,0,0.95)] space-y-2.5 sm:space-y-4 landscape:space-y-2 animate-taunt-pop max-h-[92dvh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">

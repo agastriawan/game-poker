@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Smartphone, Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { soundEngine } from "@/lib/audio/sound-engine";
 
 interface OrientationToggleBtnProps {
@@ -18,17 +18,13 @@ export default function OrientationToggleBtn({
   variant = "navbar",
 }: OrientationToggleBtnProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
 
   const updateState = useCallback(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
     const doc = document as any;
     const fs = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
-    const landscape = window.innerWidth > window.innerHeight;
-
     setIsFullscreen(fs);
-    setIsLandscape(landscape);
   }, []);
 
   useEffect(() => {
@@ -68,10 +64,8 @@ export default function OrientationToggleBtn({
     const elem = document.documentElement as any;
     const orientationApi = window.screen?.orientation as any;
 
-    const currentlyLandscapeAndFs = isFullscreen && isLandscape;
-
-    if (!currentlyLandscapeAndFs) {
-      // 1. Target: Masuk ke Mode Horizontal Fullscreen (Landscape)
+    if (!isFullscreen) {
+      // 1. Target: Masuk ke Mode Fullscreen & Landscape di HP
       try {
         if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
           if (elem.requestFullscreen) {
@@ -84,7 +78,7 @@ export default function OrientationToggleBtn({
         console.warn("Fullscreen request failed:", err);
       }
 
-      // Lock orientation ke landscape jika didukung browser HP
+      // Kunci orientasi ke landscape jika didukung browser HP
       if (orientationApi?.lock) {
         try {
           await orientationApi.lock("landscape");
@@ -93,15 +87,10 @@ export default function OrientationToggleBtn({
         }
       }
     } else {
-      // 2. Target: Kembali ke Mode Vertikal (Portrait / Normal)
+      // 2. Target: Keluar dari Fullscreen (Kembali ke Normal)
       if (orientationApi?.unlock) {
         try {
           orientationApi.unlock();
-        } catch {}
-      }
-      if (orientationApi?.lock) {
-        try {
-          await orientationApi.lock("portrait");
         } catch {}
       }
 
@@ -121,15 +110,13 @@ export default function OrientationToggleBtn({
     setTimeout(updateState, 300);
   };
 
-  const isTargetingVertical = isFullscreen && isLandscape;
-
   // Ukuran icon & padding
   const paddingClass =
     size === "sm"
-      ? "p-1.5 sm:px-2 sm:py-1 text-[10px]"
-      : "p-2 sm:px-3 sm:py-1.5 text-xs";
+      ? "p-1.5 sm:px-2.5 sm:py-1.5 text-[10px]"
+      : "p-2 sm:px-3 sm:py-2 text-xs";
   const iconClass =
-    size === "sm" ? "w-3 h-3 sm:w-3.5 sm:h-3.5" : "w-3.5 h-3.5 sm:w-4 sm:h-4";
+    size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
 
   if (variant === "pill") {
     return (
@@ -137,28 +124,28 @@ export default function OrientationToggleBtn({
         type="button"
         onClick={handleToggle}
         title={
-          isTargetingVertical
-            ? "Kembali ke mode vertikal"
-            : "Putar layar ke horizontal (Layar Penuh)"
+          isFullscreen
+            ? "Keluar dari Layar Penuh (Normal)"
+            : "Masuk ke Layar Penuh (Fullscreen)"
         }
         className={[
           "flex items-center gap-1.5 rounded-full font-bold transition shadow-lg active:scale-95",
-          isTargetingVertical
+          isFullscreen
             ? "bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-300"
             : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 border border-amber-300 font-extrabold shadow-[0_0_15px_rgba(245,158,11,0.4)] animate-pulse",
           paddingClass,
           className,
         ].join(" ")}
       >
-        {isTargetingVertical ? (
+        {isFullscreen ? (
           <>
-            <Smartphone className={iconClass} />
-            {showLabel && <span>Mode Vertikal</span>}
+            <Minimize2 className={iconClass} />
+            {showLabel && <span>Normal</span>}
           </>
         ) : (
           <>
-            <Smartphone className={`${iconClass} -rotate-90`} />
-            {showLabel && <span>Layar Horizontal</span>}
+            <Maximize2 className={iconClass} />
+            {showLabel && <span>Fullscreen</span>}
           </>
         )}
       </button>
@@ -170,37 +157,31 @@ export default function OrientationToggleBtn({
       type="button"
       onClick={handleToggle}
       title={
-        isTargetingVertical
-          ? "Kembali ke mode vertikal (Keluar Layar Penuh)"
-          : "Ubah ke mode horizontal (Layar Penuh)"
+        isFullscreen
+          ? "Keluar dari Layar Penuh (Normal)"
+          : "Masuk ke Layar Penuh (Fullscreen)"
       }
       className={[
         "rounded-xl border font-black transition flex items-center gap-1.5 active:scale-95 shrink-0",
-        isTargetingVertical
+        isFullscreen
           ? "bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
           : "bg-gradient-to-r from-amber-500/25 via-orange-500/20 to-amber-500/25 hover:from-amber-500/35 hover:to-orange-500/30 border-amber-400/60 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)]",
         paddingClass,
         className,
       ].join(" ")}
     >
-      {isTargetingVertical ? (
+      {isFullscreen ? (
         <>
-          <div className="relative flex items-center justify-center">
-            <Smartphone className={iconClass} />
-            <Minimize2 className="w-2 h-2 absolute -top-0.5 -right-0.5 text-slate-400" />
-          </div>
+          <Minimize2 className={iconClass} />
           {showLabel && (
-            <span className="hidden sm:inline">Vertikal</span>
+            <span className="hidden sm:inline">Normal</span>
           )}
         </>
       ) : (
         <>
-          <div className="relative flex items-center justify-center">
-            <Smartphone className={`${iconClass} -rotate-90 text-amber-300`} />
-            <Maximize2 className="w-2 h-2 absolute -top-0.5 -right-0.5 text-amber-400 animate-pulse" />
-          </div>
+          <Maximize2 className={`${iconClass} text-amber-300 animate-pulse`} />
           {showLabel && (
-            <span className="hidden sm:inline">Horizontal</span>
+            <span className="hidden sm:inline">Fullscreen</span>
           )}
         </>
       )}
