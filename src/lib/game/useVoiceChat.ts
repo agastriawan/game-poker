@@ -5,53 +5,60 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { PlayerState } from "./types";
 
 /**
- * Konfigurasi STUN & TURN Servers untuk WebRTC Audio Chat
- * Mendukung STUN untuk negosiasi IP publik langsung & TURN Server untuk menembus
- * Symmetric NAT / CGNAT pada kartu seluler (Telkomsel/Indosat/XL) & beda Wi-Fi.
+ * Konfigurasi STUN & TURN Servers Resmi Metered.ca (Quota 50 GB/bln)
+ * Menembus Symmetric NAT / CGNAT operator seluler (Telkomsel/Indosat/XL) & beda Wi-Fi.
  */
-function getRtcConfiguration(): RTCConfiguration {
-  const customTurnUrl = process.env.NEXT_PUBLIC_TURN_URL;
-  const customTurnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME;
-  const customTurnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
+let cachedIceServers: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" },
+  { urls: "stun:stun.relay.metered.ca:80" },
+  {
+    urls: "turn:global.relay.metered.ca:80",
+    username: "13bcc5733007d4b9af2373e3",
+    credential: "odcU0RpbnfVtTki2",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+    username: "13bcc5733007d4b9af2373e3",
+    credential: "odcU0RpbnfVtTki2",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443",
+    username: "13bcc5733007d4b9af2373e3",
+    credential: "odcU0RpbnfVtTki2",
+  },
+  {
+    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+    username: "13bcc5733007d4b9af2373e3",
+    credential: "odcU0RpbnfVtTki2",
+  },
+];
 
-  const iceServers: RTCIceServer[] = [
-    // 1. Google & Cloudflare STUN Servers (Deteksi IP publik direct P2P)
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
-    { urls: "stun:stun.cloudflare.com:3478" },
-    { urls: "stun:openrelay.metered.ca:80" },
-
-    // 2. OpenRelay Free Global TURN Servers (UDP & TCP ports 80 & 443)
-    // Berfungsi menembus firewall ketat dan CGNAT jaringan seluler saat beda lokasi/Wi-Fi
-    {
-      urls: "turn:openrelay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443?transport=tcp",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-  ];
-
-  // 3. Custom TURN Server jika dikonfigurasikan di .env.local
-  if (customTurnUrl && customTurnUsername && customTurnCredential) {
-    iceServers.unshift({
-      urls: customTurnUrl,
-      username: customTurnUsername,
-      credential: customTurnCredential,
+let isFetchingIce = false;
+function refreshIceServers() {
+  if (typeof window === "undefined" || isFetchingIce) return;
+  isFetchingIce = true;
+  fetch("/api/turn")
+    .then((r) => r.json())
+    .then((servers) => {
+      if (Array.isArray(servers) && servers.length > 0) {
+        cachedIceServers = servers;
+      }
+    })
+    .catch(() => {})
+    .finally(() => {
+      isFetchingIce = false;
     });
-  }
+}
 
+if (typeof window !== "undefined") {
+  refreshIceServers();
+}
+
+function getRtcConfiguration(): RTCConfiguration {
   return {
-    iceServers,
+    iceServers: cachedIceServers,
     iceCandidatePoolSize: 10,
   };
 }
