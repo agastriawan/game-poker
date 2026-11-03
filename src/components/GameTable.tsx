@@ -24,6 +24,7 @@ import {
   Share2,
   ShieldCheck,
   SkipForward,
+  Sparkles,
   Trophy,
   Trash2,
   UserPlus,
@@ -38,6 +39,7 @@ import RulesModal from "./RulesModal";
 import WaitingRoomLobby from "./WaitingRoomLobby";
 import RotatePrompt from "./RotatePrompt";
 import OrientationToggleBtn from "./OrientationToggleBtn";
+import LightweightVictoryConfetti from "./LightweightVictoryConfetti";
 import { soundEngine } from "@/lib/audio/sound-engine";
 import { getNextBotAction } from "@/lib/game/bot";
 import { TAUNT_PRESETS } from "@/lib/game/engine";
@@ -145,6 +147,19 @@ const BOT_NAMES = ["Bot Himiya", "Bot Riko", "Bot Sari", "Bot Dodi"];
 
 type FeltTheme = "crimson" | "emerald" | "royal";
 
+function checkIsMobileOrApk(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = (navigator.userAgent || "").toLowerCase();
+  const isMobileUA = /android|iphone|ipad|ipod|mobile|silk|blackberry/i.test(ua);
+  const isSmallScreen = window.innerWidth < 1024;
+  const isTouch = typeof navigator !== "undefined" && navigator.maxTouchPoints > 1;
+  const isApk =
+    ua.includes("wv") ||
+    ua.includes("version/4.0") ||
+    ("standalone" in navigator && Boolean((navigator as any).standalone));
+  return isMobileUA || isSmallScreen || isTouch || isApk;
+}
+
 export default function GameTable({
   gameState,
   myPlayerId,
@@ -160,6 +175,17 @@ export default function GameTable({
   const [isTauntMenuOpen, setIsTauntMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+  const [showCssConfetti, setShowCssConfetti] = useState(false);
+  const [confettiEnabled, setConfettiEnabled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("poker_confetti_enabled");
+        if (saved !== null) return saved !== "false";
+      } catch {}
+    }
+    return true;
+  });
+  const celebratedRoundRef = useRef<number | null>(null);
   const [feltTheme, setFeltTheme] = useState<FeltTheme>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -212,6 +238,11 @@ export default function GameTable({
     setBgmOn(soundEngine.isBgmActive());
     setSfxOn(soundEngine.isSfxActive());
     setBgmVolume(soundEngine.getBgmVolume());
+    return () => {
+      try {
+        confetti.reset();
+      } catch {}
+    };
   }, []);
 
   useEffect(() => {
@@ -458,7 +489,20 @@ export default function GameTable({
 
   // Efek Suara & Confetti saat ronde selesai atau terjadi BOM
   useEffect(() => {
-    if (gameState.phase === "round_end" && gameState.roundSummary) {
+    if (gameState.phase !== "round_end") {
+      celebratedRoundRef.current = null;
+      setShowCssConfetti(false);
+      return;
+    }
+
+    // Pastikan hanya dirayakan TEPAT 1 KALI per nomor ronde (mencegah lag multi-trigger)
+    if (
+      gameState.phase === "round_end" &&
+      gameState.roundSummary &&
+      celebratedRoundRef.current !== gameState.roundNumber
+    ) {
+      celebratedRoundRef.current = gameState.roundNumber;
+
       if (gameState.roundSummary.endReason === "bomb") {
         soundEngine.playBombExplosion();
         setIsBombShaking(true);
@@ -470,19 +514,38 @@ export default function GameTable({
       const myResult = gameState.roundSummary.rankings.find(
         (r) => r.playerId === myPlayer?.id
       );
-      if (myResult && myResult.scoreDelta > 0) {
-        try {
-          confetti({
-            particleCount: 85,
-            spread: 75,
-            origin: { y: 0.55 },
-          });
-        } catch {
-          // ignore
+
+      // Jalankan efek kemenangan jika pemain menang skor dan efek diaktifkan
+      if (myResult && myResult.scoreDelta > 0 && confettiEnabled) {
+        if (checkIsMobileOrApk()) {
+          // MODE HP & APK: Menggunakan CSS animasi GPU hardware-accelerated (Zero lag & bebas tabrakan WebGL)
+          setShowCssConfetti(true);
+          setTimeout(() => setShowCssConfetti(false), 2600);
+        } else {
+          // MODE DESKTOP: Canvas Confetti dipadatkan menjadi 40 partikel cepat
+          try {
+            confetti({
+              particleCount: 40,
+              spread: 65,
+              ticks: 100,
+              origin: { y: 0.55 },
+              disableForReducedMotion: true,
+            });
+          } catch {
+            // Fallback CSS jika canvas error
+            setShowCssConfetti(true);
+            setTimeout(() => setShowCssConfetti(false), 2600);
+          }
         }
       }
     }
-  }, [gameState.phase, gameState.roundSummary, myPlayer?.id]);
+  }, [
+    gameState.phase,
+    gameState.roundSummary,
+    gameState.roundNumber,
+    myPlayer?.id,
+    confettiEnabled,
+  ]);
 
   // Otomasi langkah Bot
   useEffect(() => {
@@ -836,6 +899,10 @@ export default function GameTable({
 
     if (!isHost || gameState.players.length < 2 || isSubmitting) return;
     soundEngine.startBgm();
+    setShowCssConfetti(false);
+    try {
+      confetti.reset();
+    } catch {}
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
@@ -1225,11 +1292,38 @@ export default function GameTable({
                       </div>
                     )}
 
-                    <div className="pt-1">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                        Orientasi Layar Handphone
+                    <div className="pt-1 space-y-1.5">
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                          Efek Perayaan Kemenangan
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !confettiEnabled;
+                            setConfettiEnabled(next);
+                            try {
+                              localStorage.setItem("poker_confetti_enabled", String(next));
+                            } catch {}
+                          }}
+                          className={[
+                            "w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl border text-[10px] font-bold transition",
+                            confettiEnabled
+                              ? "bg-amber-400/20 border-amber-400/60 text-amber-300"
+                              : "bg-slate-900 border-slate-700 text-slate-400",
+                          ].join(" ")}
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{confettiEnabled ? "Efek Menang: Aktif" : "Efek Menang: Nonaktif"}</span>
+                        </button>
                       </div>
-                      <OrientationToggleBtn variant="pill" size="sm" className="w-full justify-center" />
+
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                          Orientasi Layar Handphone
+                        </div>
+                        <OrientationToggleBtn variant="pill" size="sm" className="w-full justify-center" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2197,7 +2291,13 @@ export default function GameTable({
 
               <button
                 type="button"
-                onClick={onLeaveRoom}
+                onClick={() => {
+                  setShowCssConfetti(false);
+                  try {
+                    confetti.reset();
+                  } catch {}
+                  onLeaveRoom();
+                }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-xs shadow transition active:scale-95 cursor-pointer"
               >
                 <Home className="w-3.5 h-3.5 shrink-0" />
@@ -2207,6 +2307,9 @@ export default function GameTable({
           </div>
         </div>
       )}
+
+      {/* Efek Confetti Kemenangan Ringan Terakselerasi GPU untuk HP / APK */}
+      {showCssConfetti && <LightweightVictoryConfetti />}
 
       {/* Modal Panduan Aturan & Audit Pengocokan */}
       <RulesModal

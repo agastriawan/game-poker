@@ -179,6 +179,32 @@ body {
   animation: timerSubtleShake 0.35s ease-in-out infinite;
 }
 
+/* =========================================================================
+   LIGHTWEIGHT HARDWARE-ACCELERATED CSS VICTORY CONFETTI (FOR MOBILE/APK)
+   Menggantikan 2D Canvas di HP/APK agar 100% bebas lag & bebas GPU stall
+   ========================================================================= */
+@keyframes cssConfettiFall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, -25px, 0) rotate(0deg) scale(1);
+  }
+  75% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift, 0px), 105vh, 0) rotate(var(--spin, 360deg)) scale(0.65);
+  }
+}
+
+.animate-css-confetti {
+  position: absolute;
+  top: -15px;
+  will-change: transform, opacity;
+  animation: cssConfettiFall var(--duration, 2s) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  pointer-events: none;
+}
+
 /* Panggung In-Game & Waiting Room Responsive */
 .ingame-landscape-stage {
   width: 100%;
