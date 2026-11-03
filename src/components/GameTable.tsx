@@ -24,7 +24,6 @@ import {
   Share2,
   ShieldCheck,
   SkipForward,
-  Sparkles,
   Trophy,
   Trash2,
   UserPlus,
@@ -51,7 +50,7 @@ import {
 import { dispatchGameAction } from "@/lib/game/room-service";
 import { useVoiceChat } from "@/lib/game/useVoiceChat";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { GameState, PlayedCombo, PlayerState, TauntEvent } from "@/lib/game/types";
+import { BotDifficulty, GameState, PlayedCombo, PlayerState, TauntEvent } from "@/lib/game/types";
 
 function PlayerTableSlot({
   player,
@@ -749,6 +748,24 @@ export default function GameTable({
     }
   };
 
+  const handleUpdateBotDifficulty = async (difficulty: BotDifficulty) => {
+    if (!isHost || isSubmitting) return;
+    try {
+      const next = await dispatchGameAction(
+        "update_room_settings",
+        gameState,
+        { botDifficulty: difficulty }
+      );
+      onStateChange(next);
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : "Gagal memperbarui tingkat kesulitan bot."
+      );
+    }
+  };
+
   const handleSaveProfile = async (newName?: string, newAvatarIdx?: number) => {
     if (!myPlayer) return;
     const finalName =
@@ -1024,6 +1041,7 @@ export default function GameTable({
           onAddBot={handleAddBot}
           onRemovePlayer={handleRemovePlayer}
           onUpdateTurnLimit={handleUpdateTurnLimit}
+          onUpdateBotDifficulty={handleUpdateBotDifficulty}
           onStartGame={handleStartRound}
           onLeaveRoom={() => setIsLeaveConfirmOpen(true)}
           onOpenRules={() => setIsRulesOpen(true)}
@@ -1264,7 +1282,7 @@ export default function GameTable({
                       className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-[11px] font-bold text-emerald-300 transition"
                     >
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Aturan</span>
+                      <span>Aturan Meja</span>
                     </button>
 
                     <button
@@ -1396,65 +1414,15 @@ export default function GameTable({
                     />
                   </div>
 
-                  {/* 2. KONTEN MEJA SAAT FASE KUMPUL ANGKA 3 */}
+                  {/* 2. STATUS FASE KUMPUL ANGKA 3 DI PERMUKAAN MEJA (POPUP FOKUS DIRENDER MODAL FULLSCREEN) */}
                   {gameState.phase === "collecting_threes" && (
-                    <div className="relative z-10 w-full max-w-md bg-slate-950/90 border border-amber-400/60 rounded-2xl p-3 text-center space-y-2.5 shadow-2xl">
-                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-black uppercase">
-                        <Sparkles className="w-3 h-3" /> Kumpul Angka 3
+                    <div className="relative z-10 text-center space-y-1 select-none pointer-events-none animate-fade-in">
+                      <div className="text-xs sm:text-sm font-black text-amber-300 tracking-wider uppercase">
+                        Fase Kumpul Angka 3
                       </div>
-
-                      {/* Kartu 3 yang sudah terkumpul */}
-                      {gameState.collectedThreesPool.length > 0 && (
-                        <div className="flex flex-wrap items-center justify-center gap-1.5">
-                          {gameState.collectedThreesPool.map((entry) => (
-                            <div
-                              key={entry.playerId}
-                              className={[
-                                "px-2.5 py-1 rounded-lg border text-[11px] flex items-center gap-1.5 animate-card-throw",
-                                entry.hasThreeOfSpades
-                                  ? "bg-amber-500/25 border-amber-400"
-                                  : "bg-slate-900/90 border-slate-700",
-                              ].join(" ")}
-                            >
-                              <span className="font-bold">
-                                {entry.playerName}:
-                              </span>
-                              {entry.cards.length === 0 ? (
-                                <span className="text-slate-400 italic">-</span>
-                              ) : (
-                                <span className="font-black text-amber-300">
-                                  {entry.cards
-                                    .map(
-                                      (c) =>
-                                        `3${
-                                          c.suit === "spades"
-                                            ? "♠"
-                                            : c.suit === "hearts"
-                                            ? "♥"
-                                            : c.suit === "clubs"
-                                            ? "♣"
-                                            : "♦"
-                                        }`
-                                    )
-                                    .join(" ")}
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {myPlayer && !myPlayer.hasSubmittedThrees && (
-                        <button
-                          onClick={handleSubmitThrees}
-                          disabled={isSubmitting}
-                          className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-lg transition transform hover:scale-105"
-                        >
-                          {myThreesCount > 0
-                            ? `🃏 Kumpul Angka 3 (${myThreesCount})`
-                            : `✅ Lanjut`}
-                        </button>
-                      )}
+                      <p className="text-[10px] text-slate-400">
+                        Menunggu setoran kartu pemain...
+                      </p>
                     </div>
                   )}
 
@@ -1542,78 +1510,14 @@ export default function GameTable({
                     </div>
                   )}
 
-                  {/* 4. KONTEN MEJA SAAT RONDE SELESAI (ROUND END) */}
-                  {gameState.phase === "round_end" &&
-                    gameState.roundSummary && (
-                      <div className="round-summary-card relative z-30 w-full max-w-xs sm:max-w-md bg-slate-950/95 border-2 border-amber-400 rounded-xl sm:rounded-2xl p-2 sm:p-3 text-center space-y-1 sm:space-y-2 shadow-2xl animate-taunt-pop">
-                        {gameState.roundSummary.endReason === "bomb" &&
-                        gameState.roundSummary.bombResolution ? (
-                          <div className="space-y-0.5 bg-red-950/70 border border-red-500/50 rounded-xl p-1.5 sm:p-2">
-                            <div className="text-[10px] font-black text-amber-300 uppercase">
-                              💥 BOM MELEDAK!
-                            </div>
-                            <div className="text-xs sm:text-sm font-black text-white">
-                              {gameState.roundSummary.bombResolution.bomberName}{" "}
-                              →{" "}
-                              {gameState.roundSummary.bombResolution.victimName}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-[11px] sm:text-sm font-black text-amber-300 flex items-center justify-center gap-1">
-                            <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />{" "}
-                            <span>Juara 1: {gameState.roundSummary.nextStarterName}</span>
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-1 text-[10px] sm:text-[11px]">
-                          {gameState.roundSummary.rankings.map((r) => (
-                            <div
-                              key={r.playerId}
-                              className="flex items-center justify-between px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-slate-900 border border-slate-800"
-                            >
-                              <span className="font-bold truncate max-w-[85px] sm:max-w-none">
-                                {r.playerName}
-                              </span>
-                              <span
-                                className={[
-                                  "font-mono font-black ml-1 shrink-0",
-                                  r.scoreDelta > 0
-                                    ? "text-emerald-400"
-                                    : r.scoreDelta < 0
-                                    ? "text-rose-400"
-                                    : "text-slate-400",
-                                ].join(" ")}
-                              >
-                                {r.scoreDelta > 0
-                                  ? `+${r.scoreDelta}`
-                                  : r.scoreDelta}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 pt-0.5 sm:pt-1">
-                          {isHost && (
-                            <button
-                              onClick={handleStartRound}
-                              disabled={isSubmitting}
-                              className="px-3.5 sm:px-5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-[11px] sm:text-xs shadow-lg transition active:scale-95"
-                            >
-                              🚀 Main Lagi
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={onLeaveRoom}
-                            className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-[11px] sm:text-xs shadow transition active:scale-95"
-                          >
-                            <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                            <span>Kembali ke Main Menu</span>
-                          </button>
-                        </div>
+                  {/* 4. STATUS RONDE SELESAI DI PERMUKAAN MEJA (POPUP FOKUS DIRENDER MODAL FULLSCREEN) */}
+                  {gameState.phase === "round_end" && (
+                    <div className="relative z-10 text-center space-y-1 select-none pointer-events-none animate-fade-in">
+                      <div className="text-xs sm:text-sm font-black text-amber-300 tracking-wider uppercase">
+                        Ronde Selesai
                       </div>
-                    )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1629,7 +1533,7 @@ export default function GameTable({
             {errorMsg && (
               <div className="pointer-events-none absolute -top-24 sm:-top-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 whitespace-nowrap">
                 <span className="px-3 py-0.5 rounded-full bg-rose-950/95 border border-rose-500 text-rose-200 text-[11px] font-bold shadow-lg">
-                  ⚠️ {errorMsg}
+                  {errorMsg}
                 </span>
               </div>
             )}
@@ -1651,8 +1555,8 @@ export default function GameTable({
               {myPlayer.isForfeited ? (
                 <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-900/90 border border-rose-500/50 rounded-2xl text-center sm:text-left shadow-lg my-1">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-xl shrink-0">
-                      🏳️
+                    <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-rose-300 font-bold shrink-0">
+                      <X className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="text-xs sm:text-sm font-black text-rose-300">
@@ -1746,14 +1650,14 @@ export default function GameTable({
                             {beatValidation?.isBomb ? (
                               <>
                                 <Flame className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-slate-950 fill-current animate-bounce" />
-                                <span>💣 BOM!</span>
+                                <span>LEDANGKAN BOM!</span>
                               </>
                             ) : evaluatedSelectedCombo && beatValidation?.valid ? (
                               <span>
-                                🃏 Banting {getComboDisplayLabel(evaluatedSelectedCombo)}
+                                Banting {getComboDisplayLabel(evaluatedSelectedCombo)}
                               </span>
                             ) : (
-                              <span>🃏 Banting Kartu</span>
+                              <span>Banting Kartu</span>
                             )}
                           </button>
 
@@ -2064,6 +1968,241 @@ export default function GameTable({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL FOKUS FULLSCREEN: FASE KUMPUL ANGKA 3                      */}
+      {/* Mencegah terpotong pada layar HP/dekstop & fokus perhatian penuh */}
+      {/* ================================================================= */}
+      {gameState.phase === "collecting_threes" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 animate-fade-in">
+          <div className="w-full max-w-md max-h-[92vh] overflow-y-auto bg-slate-950/95 border border-amber-400/80 rounded-2xl p-4 sm:p-5 text-center space-y-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.95)] animate-taunt-pop">
+            {/* Header Badge & Judul (Tanpa Emoticon) */}
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/50 text-amber-300 text-[10px] font-black uppercase tracking-wider">
+                <Crown className="w-3 h-3 fill-amber-400" />
+                <span>Penentuan Giliran Awal</span>
+              </div>
+              <h3 className="text-sm sm:text-base font-black text-white tracking-wide">
+                Kumpul Kartu Angka Tiga (3)
+              </h3>
+              <p className="text-[11px] text-slate-300 leading-relaxed max-w-sm mx-auto">
+                Kartu angka 3 dikumpulkan ke meja. Pemilik{" "}
+                <strong className="text-amber-300 font-black">3 Sekop (3♠)</strong> berhak{" "}
+                <strong className="text-emerald-400 font-black">jalan pertama</strong>!
+              </p>
+            </div>
+
+            {/* Kartu 3 yang sudah terkumpul di Meja */}
+            <div className="bg-black/50 border border-white/10 rounded-xl p-2.5 space-y-1.5">
+              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-between">
+                <span>Setoran Kartu Pemain:</span>
+                {gameState.collectedThreesPool.some((e) => e.hasThreeOfSpades) && (
+                  <span className="text-amber-300 font-black flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-amber-300 stroke-[3]" />
+                    <span>3♠ Ditemukan!</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {gameState.players.map((p) => {
+                  const entry = gameState.collectedThreesPool.find(
+                    (e) => e.playerId === p.id
+                  );
+                  const hasSubmitted = Boolean(entry);
+                  const isMe = p.id === myPlayer?.id;
+
+                  return (
+                    <div
+                      key={p.id}
+                      className={[
+                        "p-1.5 rounded-xl border text-center transition flex flex-col justify-between min-h-[48px]",
+                        entry?.hasThreeOfSpades
+                          ? "bg-amber-400/25 border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.4)]"
+                          : hasSubmitted
+                          ? "bg-white/5 border-white/10"
+                          : "bg-black/30 border-white/5 opacity-50",
+                      ].join(" ")}
+                    >
+                      <div className="text-[9px] sm:text-[10px] font-bold text-slate-300 truncate">
+                        {isMe ? `${p.name} (Kamu)` : p.name}
+                      </div>
+                      <div className="mt-1">
+                        {!entry ? (
+                          <span className="text-[9px] text-amber-300/80 animate-pulse font-semibold">
+                            Menunggu...
+                          </span>
+                        ) : entry.cards.length === 0 ? (
+                          <span className="text-[9px] text-slate-500 font-semibold italic">
+                            Tidak Ada 3
+                          </span>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            {entry.cards.map((c) => (
+                              <span
+                                key={c.id}
+                                className={[
+                                  "text-xs font-black",
+                                  c.suit === "spades"
+                                    ? "text-amber-300 drop-shadow font-extrabold"
+                                    : c.suit === "hearts" ||
+                                      c.suit === "diamonds"
+                                    ? "text-rose-400"
+                                    : "text-slate-200",
+                                ].join(" ")}
+                              >
+                                {`3${
+                                  c.suit === "spades"
+                                    ? "♠"
+                                    : c.suit === "hearts"
+                                    ? "♥"
+                                    : c.suit === "clubs"
+                                    ? "♣"
+                                    : "♦"
+                                }`}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Pesan Edukasi untuk Posisi Pemain Sendiri (Tanpa Emoticon) */}
+            {myPlayer && (
+              <div>
+                {myPlayer.hand.some(
+                  (c) => c.value === 3 && c.suit === "spades"
+                ) ? (
+                  <div className="px-3 py-1.5 rounded-xl bg-amber-400/20 border border-amber-400/60 text-amber-200 text-xs font-black flex items-center justify-center gap-1.5 animate-pulse">
+                    <Check className="w-3.5 h-3.5 text-amber-300 stroke-[3]" />
+                    <span>
+                      Kamu memegang 3 Sekop (3♠)! Kamu berhak jalan pertama.
+                    </span>
+                  </div>
+                ) : myThreesCount > 0 ? (
+                  <div className="px-3 py-1.5 rounded-xl bg-sky-950/70 border border-sky-400/50 text-sky-200 text-xs font-bold flex items-center justify-center gap-1.5">
+                    <span>
+                      Kamu punya {myThreesCount} kartu 3 yang disetor ke kolam meja.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5">
+                    <span>
+                      Kamu tidak memegang kartu 3. Pemilik 3♠ akan jalan pertama.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tombol Aksi Player (Tanpa Emoticon & Ikon Bintang) */}
+            {myPlayer && !myPlayer.hasSubmittedThrees ? (
+              <button
+                type="button"
+                onClick={handleSubmitThrees}
+                disabled={isSubmitting}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm shadow-[0_4px_16px_rgba(245,158,11,0.3)] transition transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {myThreesCount > 0 ? (
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Setorkan Kartu 3 ({myThreesCount}) & Mulai</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Mengerti, Siap Main!</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="text-[11px] text-amber-300 font-bold flex items-center justify-center gap-1.5 py-1">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Menunggu pemain lain menyetorkan kartu 3...</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL FOKUS FULLSCREEN: RINGKASAN AKHIR RONDE (ROUND END)        */}
+      {/* ================================================================= */}
+      {gameState.phase === "round_end" && gameState.roundSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 animate-fade-in">
+          <div className="w-full max-w-sm sm:max-w-md max-h-[92vh] overflow-y-auto bg-slate-950/95 border border-amber-400/80 rounded-2xl p-4 sm:p-5 text-center space-y-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.95)] animate-taunt-pop">
+            {gameState.roundSummary.endReason === "bomb" &&
+            gameState.roundSummary.bombResolution ? (
+              <div className="space-y-0.5 bg-red-950/70 border border-red-500/50 rounded-xl p-2">
+                <div className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                  BOM MELEDAK!
+                </div>
+                <div className="text-xs sm:text-sm font-black text-white">
+                  {gameState.roundSummary.bombResolution.bomberName} →{" "}
+                  {gameState.roundSummary.bombResolution.victimName}
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs sm:text-sm font-black text-amber-300 flex items-center justify-center gap-1.5">
+                <Crown className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Juara 1: {gameState.roundSummary.nextStarterName}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              {gameState.roundSummary.rankings.map((r) => (
+                <div
+                  key={r.playerId}
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800"
+                >
+                  <span className="font-bold truncate max-w-[85px] sm:max-w-none">
+                    {r.playerName}
+                  </span>
+                  <span
+                    className={[
+                      "font-mono font-black ml-1 shrink-0",
+                      r.scoreDelta > 0
+                        ? "text-emerald-400"
+                        : r.scoreDelta < 0
+                        ? "text-rose-400"
+                        : "text-slate-400",
+                    ].join(" ")}
+                  >
+                    {r.scoreDelta > 0 ? `+${r.scoreDelta}` : r.scoreDelta}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              {isHost && (
+                <button
+                  type="button"
+                  onClick={handleStartRound}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Main Lagi</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onLeaveRoom}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-xs shadow transition active:scale-95 cursor-pointer"
+              >
+                <Home className="w-3.5 h-3.5 shrink-0" />
+                <span>Kembali ke Main Menu</span>
+              </button>
             </div>
           </div>
         </div>

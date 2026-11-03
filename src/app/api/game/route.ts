@@ -62,6 +62,12 @@ export async function POST(req: NextRequest) {
           payload?.turnDurationLimit !== undefined
             ? Number(payload.turnDurationLimit)
             : 20;
+        const botDifficulty =
+          payload?.botDifficulty === "easy" ||
+          payload?.botDifficulty === "hard" ||
+          payload?.botDifficulty === "medium"
+            ? payload.botDifficulty
+            : "medium";
 
         let tempState = createInitialGameState({ roomCode, hostId, hostName });
         tempState = {
@@ -70,7 +76,10 @@ export async function POST(req: NextRequest) {
             p.id === hostId ? { ...p, isReady: true } : p
           ),
         };
-        tempState = updateRoomSettings(tempState, { turnDurationLimit });
+        tempState = updateRoomSettings(tempState, {
+          turnDurationLimit,
+          botDifficulty,
+        });
 
         const botNames = ["Bot Himiya", "Bot Riko", "Bot Sari"];
         for (let i = 0; i < totalPlayers - 1; i++) {
@@ -159,6 +168,12 @@ export async function POST(req: NextRequest) {
           turnDurationLimit:
             payload?.turnDurationLimit !== undefined
               ? Number(payload.turnDurationLimit)
+              : undefined,
+          botDifficulty:
+            payload?.botDifficulty === "easy" ||
+            payload?.botDifficulty === "hard" ||
+            payload?.botDifficulty === "medium"
+              ? payload.botDifficulty
               : undefined,
         });
         break;

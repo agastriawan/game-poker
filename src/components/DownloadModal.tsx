@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ExternalLink,
   X,
-  Sparkles,
   Share2,
   ShieldCheck,
 } from "lucide-react";
@@ -211,7 +210,7 @@ export default function DownloadModal({ isOpen, onClose }: DownloadModalProps) {
             ) : (
               <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2 text-xs text-slate-300">
                 <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Smartphone className="w-3.5 h-3.5" />
                   Cara Pasang Cepat di Browser:
                 </div>
                 <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
@@ -229,7 +228,7 @@ export default function DownloadModal({ isOpen, onClose }: DownloadModalProps) {
                 onClick={handleInstallPWA}
                 className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-md"
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Download className="w-3.5 h-3.5" />
                 <span>Pasang Langsung di Layar HP Ini Sekarang</span>
               </button>
             )}

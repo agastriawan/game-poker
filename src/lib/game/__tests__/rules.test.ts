@@ -18,6 +18,7 @@ import {
   findAllValidPlays,
 } from "../rules";
 import { checkRedealCondition, dealFairHandsWithRedealCheck } from "../shuffle";
+import { getNextBotAction } from "../bot";
 import { Card } from "../types";
 
 function makeCard(
@@ -513,6 +514,110 @@ function testPlayerForfeitKeepsGameRunning() {
 }
 
 testPlayerForfeitKeepsGameRunning();
+
+// 11. Uji Kecerdasan Bot & Tingkat Kesulitan (Easy, Medium, Hard)
+function testBotIntelligenceAndDifficulty() {
+  // Scenario A: Lawan sisa 1 kartu -> Bot Medium/Hard DILARANG buang single kecil jika punya kombo
+  let state = createInitialGameState({
+    roomCode: "BOTA11",
+    hostId: "user-human",
+    hostName: "Pemain Manusia",
+  });
+  state = addPlayerToGame(state, { id: "bot-1", name: "Bot Himiya", isBot: true });
+  state = {
+    ...state,
+    phase: "playing",
+    botDifficulty: "medium",
+    currentTurnPlayerId: "bot-1",
+    currentTablePlay: null,
+    players: [
+      {
+        ...state.players[0],
+        hand: [makeCard("A", 14, "spades")], // Manusia sisa 1 kartu!
+        finishRank: null,
+      },
+      {
+        ...state.players[1],
+        hand: [
+          makeCard("4", 4, "diamonds"),
+          makeCard("5", 5, "hearts"),
+          makeCard("5", 5, "spades"),
+        ],
+        finishRank: null,
+      },
+    ],
+  };
+
+  const action = getNextBotAction(state);
+  assert.equal(action?.actionType, "play");
+  assert.equal(action?.cardIds?.length, 2, "Bot Medium harus melempar Pair 5-5 daripada single 4 saat lawan sisa 1 kartu!");
+
+  // Scenario B: Bot hanya punya single [4♦, K♠, 2♣] dan lawan sisa 1 kartu -> Bot Medium/Hard harus melempar single tertinggi (2♣ atau K♠), BUKAN 4♦
+  state = {
+    ...state,
+    botDifficulty: "medium",
+    players: [
+      {
+        ...state.players[0],
+        hand: [makeCard("9", 9, "hearts")], // Lawan sisa 1 kartu
+        finishRank: null,
+      },
+      {
+        ...state.players[1],
+        hand: [
+          makeCard("4", 4, "diamonds"),
+          makeCard("K", 13, "spades"),
+          makeCard("2", 15, "clubs"),
+        ],
+        finishRank: null,
+      },
+    ],
+  };
+  const actionB = getNextBotAction(state);
+  assert.equal(actionB?.actionType, "play");
+  assert.notEqual(actionB?.cardIds?.[0], "4-diamonds", "Bot tidak boleh buang 4♦ yang memberi kemenangan gratis ke lawan 1 kartu!");
+
+  // Scenario C: Hard Mode Tactical Pass (Menahan kartu sakti 2 saat meja berisi kartu kecil dan tidak darurat)
+  state = {
+    ...state,
+    botDifficulty: "hard",
+    currentTablePlay: {
+      playerId: "user-human",
+      playerName: "Pemain Manusia",
+      combo: evaluateCombo([makeCard("8", 8, "hearts")])!,
+      timestamp: Date.now(),
+    },
+    players: [
+      {
+        ...state.players[0],
+        hand: [
+          makeCard("9", 9, "hearts"),
+          makeCard("10", 10, "hearts"),
+          makeCard("J", 11, "hearts"),
+          makeCard("Q", 12, "hearts"),
+        ],
+        finishRank: null,
+      },
+      {
+        ...state.players[1],
+        hand: [
+          makeCard("4", 4, "diamonds"),
+          makeCard("5", 5, "clubs"),
+          makeCard("6", 6, "spades"),
+          makeCard("7", 7, "hearts"),
+          makeCard("2", 15, "spades"), // Satu-satunya yang bisa melawan 8 adalah 2
+        ],
+        finishRank: null,
+      },
+    ],
+  };
+  const actionC = getNextBotAction(state);
+  assert.equal(actionC?.actionType, "pass", "Bot Hard mode harus Pass secara taktis untuk menyimpan kartu 2!");
+
+  console.log("✅ [PASS] Kecerdasan Bot & Tingkat Kesulitan: Anti-Kebobolan 1 Kartu Lawan & Tactical Pass");
+}
+
+testBotIntelligenceAndDifficulty();
 
 console.log("\n🎉 SEMUA UNIT TEST BERHASIL 100% TANPA ERROR!");
 

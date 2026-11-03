@@ -65,6 +65,16 @@ export default function Model3DAvatar({
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const isCurrentTurnRef = useRef(isCurrentTurn);
+  const autoRotateRef = useRef(autoRotate);
+  const facingRef = useRef(facing);
+
+  useEffect(() => {
+    isCurrentTurnRef.current = isCurrentTurn;
+    autoRotateRef.current = autoRotate;
+    facingRef.current = facing;
+  }, [isCurrentTurn, autoRotate, facing]);
+
   useEffect(() => {
     const container = mountRef.current;
     if (!container || !modelPath || typeof window === "undefined") return;
@@ -123,6 +133,13 @@ export default function Model3DAvatar({
         if (!isDisposed) {
           setHasError(true);
           setIsLoading(false);
+          try {
+            if (container.contains(renderer.domElement)) {
+              container.removeChild(renderer.domElement);
+            }
+          } catch {
+            // Abaikan
+          }
         }
       };
       renderer.domElement.addEventListener("webglcontextlost", onContextLost, false);
@@ -311,6 +328,20 @@ export default function Model3DAvatar({
         // 5. Render Loop yang Mulus (60fps)
         const animate = () => {
           if (isDisposed) return;
+
+          const gl = renderer.getContext();
+          if (gl?.isContextLost && gl.isContextLost()) {
+            setHasError(true);
+            try {
+              if (container.contains(renderer.domElement)) {
+                container.removeChild(renderer.domElement);
+              }
+            } catch {
+              // Abaikan
+            }
+            return;
+          }
+
           animationFrameId = requestAnimationFrame(animate);
 
           // Batasi delta maksimum 0.05s agar animasi tidak melompat jika tab sempat background
@@ -321,16 +352,23 @@ export default function Model3DAvatar({
             mixer.update(delta);
           }
 
-          if (autoRotate || focus === "full") {
+          let curBaseAngle = 0;
+          if (facingRef.current === "left") {
+            curBaseAngle = 0.35;
+          } else if (facingRef.current === "right") {
+            curBaseAngle = -0.35;
+          }
+
+          if (autoRotateRef.current || focus === "full") {
             pivot.rotation.y += 0.012;
-          } else if (isCurrentTurn) {
+          } else if (isCurrentTurnRef.current) {
             // Berayun lebih aktif saat giliran jalan
             const t = clock.getElapsedTime();
-            pivot.rotation.y = baseAngle + Math.sin(t * 1.5) * 0.16;
+            pivot.rotation.y = curBaseAngle + Math.sin(t * 1.5) * 0.16;
           } else {
             // Ayunan nafas santai halus
             const t = clock.getElapsedTime();
-            pivot.rotation.y = baseAngle + Math.sin(t * 0.7) * 0.06;
+            pivot.rotation.y = curBaseAngle + Math.sin(t * 0.7) * 0.06;
           }
 
           renderer.render(scene, camera);
@@ -396,7 +434,7 @@ export default function Model3DAvatar({
         container.removeChild(renderer.domElement);
       }
     };
-  }, [modelPath, focus, autoRotate, isCurrentTurn, facing]);
+  }, [modelPath, focus]);
 
   if (hasError) {
     return <>{fallback || null}</>;

@@ -153,10 +153,10 @@ export default function OrientationToggleBtn({
             : "Masuk ke Layar Penuh (Fullscreen)"
         }
         className={[
-          "flex items-center gap-1.5 rounded-full font-bold transition shadow-lg active:scale-95",
+          "flex items-center gap-1.5 rounded-xl font-bold transition shadow-lg active:scale-95 cursor-pointer",
           isFullscreen
             ? "bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-300"
-            : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 border border-amber-300 font-extrabold shadow-[0_0_15px_rgba(245,158,11,0.4)] animate-pulse",
+            : "bg-amber-400 text-slate-950 font-black shadow-[0_0_15px_rgba(245,158,11,0.3)]",
           paddingClass,
           className,
         ].join(" ")}
@@ -186,24 +186,24 @@ export default function OrientationToggleBtn({
           : "Masuk ke Layar Penuh (Fullscreen)"
       }
       className={[
-        "rounded-xl border font-black transition flex items-center gap-1.5 active:scale-95 shrink-0",
+        "rounded-xl modern-glass-pill font-bold transition flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer",
         isFullscreen
-          ? "bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
-          : "bg-gradient-to-r from-amber-500/25 via-orange-500/20 to-amber-500/25 hover:from-amber-500/35 hover:to-orange-500/30 border-amber-400/60 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)]",
+          ? "text-slate-300 hover:text-white"
+          : "text-slate-200 hover:text-white",
         paddingClass,
         className,
       ].join(" ")}
     >
       {isFullscreen ? (
         <>
-          <Minimize2 className={iconClass} />
+          <Minimize2 className={`${iconClass} text-slate-300`} />
           {showLabel && (
             <span className="hidden sm:inline">Normal</span>
           )}
         </>
       ) : (
         <>
-          <Maximize2 className={`${iconClass} text-amber-300 animate-pulse`} />
+          <Maximize2 className={`${iconClass} text-amber-400`} />
           {showLabel && (
             <span className="hidden sm:inline">Fullscreen</span>
           )}

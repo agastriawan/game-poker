@@ -152,6 +152,8 @@ export interface TauntEvent {
   timestamp: number;
 }
 
+export type BotDifficulty = "easy" | "medium" | "hard";
+
 export interface GameState {
   roomCode: string;
   hostId: string;
@@ -167,6 +169,8 @@ export interface GameState {
   previousWinnerId: string | null;
   /** Batas waktu giliran per orang dalam detik (20, 30, 40, 50, 60, atau 0 = unlimited) */
   turnDurationLimit?: number;
+  /** Tingkat kesulitan bot: "easy" (Santai), "medium" (Menengah/Taktis), "hard" (Sulit/Pro) */
+  botDifficulty?: BotDifficulty;
   players: PlayerState[];
   /** ID pemain yang sedang mendapat giliran jalan */
   currentTurnPlayerId: string | null;

@@ -6,6 +6,7 @@ import {
 import { dealFairHandsWithRedealCheck } from "./shuffle";
 import {
   BombResolution,
+  BotDifficulty,
   Card,
   CollectedThreeEntry,
   GameState,
@@ -77,6 +78,7 @@ export function createInitialGameState(params: {
     mustCollectThrees: true,
     previousWinnerId: null,
     turnDurationLimit: 20,
+    botDifficulty: "medium",
     players: [hostPlayer],
     currentTurnPlayerId: null,
     currentTablePlay: null,
@@ -158,27 +160,48 @@ export function removePlayerFromGame(
 }
 
 /**
- * Memperbarui pengaturan room (misal batas waktu giliran).
+ * Memperbarui pengaturan room (misal batas waktu giliran & tingkat kesulitan bot).
  */
 export function updateRoomSettings(
   state: GameState,
-  settings: { turnDurationLimit?: number }
+  settings: { turnDurationLimit?: number; botDifficulty?: BotDifficulty }
 ): GameState {
   const turnDurationLimit =
     settings.turnDurationLimit !== undefined
       ? Number(settings.turnDurationLimit)
       : state.turnDurationLimit ?? 20;
 
+  const botDifficulty =
+    settings.botDifficulty !== undefined
+      ? settings.botDifficulty
+      : state.botDifficulty ?? "medium";
+
   const limitText =
     turnDurationLimit === 0 ? "Unlimited (Tanpa Batas)" : `${turnDurationLimit} detik`;
+
+  const diffLabel =
+    botDifficulty === "easy"
+      ? "Santai"
+      : botDifficulty === "hard"
+      ? "Sulit / Pro"
+      : "Menengah / Taktis";
+
+  const newLogs = [...(state.logs || [])];
+  if (settings.turnDurationLimit !== undefined) {
+    newLogs.push(`Waktu giliran diatur ke: ${limitText}.`);
+  }
+  if (settings.botDifficulty !== undefined) {
+    newLogs.push(`Tingkat kesulitan Bot diatur ke: ${diffLabel}.`);
+  }
+  if (newLogs.length === (state.logs || []).length) {
+    newLogs.push(`Pengaturan room diperbarui.`);
+  }
 
   return {
     ...state,
     turnDurationLimit,
-    logs: [
-      ...(state.logs || []).slice(-19),
-      `Pengaturan waktu giliran diatur ke: ${limitText}.`,
-    ],
+    botDifficulty,
+    logs: newLogs.slice(-20),
     updatedAt: Date.now(),
   };
 }

@@ -28,9 +28,9 @@ export const CHARACTER_PROFILES = [
     id: 0,
     title: "Selena",
     heroName: "Selena",
-    icon: "🎤",
+    icon: "S",
     role: "S.T.U.N. Vocalist",
-    quote: "Irama kartu, kombo maut! 🎵",
+    quote: "Irama kartu, kombo maut!",
     gradient: "from-purple-500 via-pink-600 to-slate-900",
     borderGlow: "border-purple-400/70",
     hairColor: "#f472b6",
@@ -41,9 +41,9 @@ export const CHARACTER_PROFILES = [
     id: 1,
     title: "Kagura",
     heroName: "Kagura",
-    icon: "☂️",
+    icon: "K",
     role: "Onmyouji Master",
-    quote: "3 Sekop di tangan, semua minggir! ♠️",
+    quote: "3 Sekop di tangan, semua minggir!",
     gradient: "from-cyan-500 via-blue-700 to-slate-900",
     borderGlow: "border-cyan-400/70",
     hairColor: "#e0e7ff",
@@ -54,9 +54,9 @@ export const CHARACTER_PROFILES = [
     id: 2,
     title: "Natalia",
     heroName: "Natalia",
-    icon: "🗡️",
+    icon: "N",
     role: "Silent Assassin",
-    quote: "Jangan berani buang 1 Poker! 💣",
+    quote: "Jangan sembarangan buang 1 Poker!",
     gradient: "from-rose-500 via-purple-700 to-slate-950",
     borderGlow: "border-rose-400/70",
     hairColor: "#fda4af",
@@ -67,9 +67,9 @@ export const CHARACTER_PROFILES = [
     id: 3,
     title: "Vexana",
     heroName: "Vexana",
-    icon: "👑",
+    icon: "V",
     role: "Necromancer Queen",
-    quote: "Main santai tapi pasti Juara 1! 👑",
+    quote: "Main taktis tapi pasti Juara 1!",
     gradient: "from-emerald-500 via-teal-700 to-slate-950",
     borderGlow: "border-emerald-400/70",
     hairColor: "#a7f3d0",
@@ -197,8 +197,17 @@ export default function PlayerSeat3D({
             isForfeited={player.isForfeited}
             className={[avatarSizeClass, "player-avatar-3d"].join(" ")}
             fallback={
-              <div className="w-16 h-16 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-bold">
-                {charProfile.heroName}
+              <div
+                className={[
+                  "w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br flex flex-col items-center justify-center border-2 shadow-xl",
+                  charProfile.gradient,
+                  charProfile.borderGlow,
+                ].join(" ")}
+              >
+                <span className="text-2xl drop-shadow">{charProfile.icon}</span>
+                <span className="text-[10px] font-black text-white uppercase tracking-wider">
+                  {charProfile.heroName}
+                </span>
               </div>
             }
           />
@@ -211,11 +220,11 @@ export default function PlayerSeat3D({
         {/* BADGE GILIRAN / FORFEIT / RANK DI SISI KARAKTER */}
         {player.isForfeited ? (
           <div className="absolute top-2 right-1 px-2 py-0.5 rounded-full bg-rose-950/95 border border-rose-500 text-rose-300 font-black text-[9px] shadow-lg">
-            🏳️ #{player.finishRank}
+            Kalah #{player.finishRank}
           </div>
         ) : player.finishRank !== null ? (
           <div className="absolute top-2 right-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black text-[9px] shadow-lg border border-white">
-            🏆 #{player.finishRank}
+            Juara #{player.finishRank}
           </div>
         ) : isCurrentTurn ? (
           <div
@@ -227,8 +236,8 @@ export default function PlayerSeat3D({
             ].join(" ")}
           >
             {typeof turnSecondsLeft === "number"
-              ? `⏱️ ${turnSecondsLeft}s`
-              : "⚡ GILIRAN"}
+              ? `${turnSecondsLeft}s`
+              : "GILIRAN"}
           </div>
         ) : player.hasPassedThisTrick ? (
           <div className="absolute top-2 right-1 px-2 py-0.5 rounded-full bg-slate-900/95 border border-rose-500/60 text-rose-300 font-black text-[9px] uppercase shadow">

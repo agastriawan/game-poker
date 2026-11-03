@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { X, ShieldCheck, Flame, Crown, Sparkles, Trophy } from "lucide-react";
+import { X, ShieldCheck, Flame, Crown, Trophy } from "lucide-react";
 import { ShuffleMetadata } from "@/lib/game/types";
 
 interface RulesModalProps {
@@ -43,7 +43,7 @@ export default function RulesModal({
           {/* 1. Pembuka & Kumpul Angka 3 */}
           <section className="bg-slate-800/60 border border-slate-700/70 rounded-xl p-4 space-y-2">
             <h3 className="font-bold text-amber-400 flex items-center gap-2 text-base">
-              <Sparkles className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
               1. Fase Kumpul Angka 3 & Pemilik 3 Sekop (3♠)
             </h3>
             <ul className="list-disc list-inside space-y-1 text-slate-300">
