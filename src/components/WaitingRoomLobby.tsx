@@ -180,7 +180,7 @@ export default function WaitingRoomLobby({
   const currentBotDiff = gameState.botDifficulty || "medium";
 
   return (
-    <div className="relative z-30 w-full h-full flex flex-col justify-between p-2 sm:p-3 lg:p-4 text-white max-w-7xl mx-auto select-none safe-top-inset">
+    <div className="relative z-30 w-full h-full max-h-screen flex flex-col justify-between p-1.5 sm:p-2.5 lg:p-4 text-white max-w-7xl mx-auto select-none safe-top-inset overflow-hidden">
       {/* Ambient Radial Spotlight */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[140px] opacity-35 bg-amber-500/20" />
@@ -189,7 +189,7 @@ export default function WaitingRoomLobby({
       {/* ================================================================= */}
       {/* 1. TOP HEADER BAR: UNIFIED WITH MAIN MENU (MINIMALIST 3-BUTTON)   */}
       {/* ================================================================= */}
-      <header className="relative z-20 flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-2xl modern-glass-panel shadow-2xl border border-white/10 shrink-0">
+      <header className="relative z-20 flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl modern-glass-panel shadow-2xl border border-white/10 shrink-0">
         {/* Sisi Kiri: Logo & Chip Room */}
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
@@ -528,10 +528,10 @@ export default function WaitingRoomLobby({
       </header>
 
       {/* ================================================================= */}
-      {/* 2. MAIN STAGE: 4 SPASIOUS PLAYER PODIUMS (BEBAS DESAK-DESAKAN)     */}
+      {/* 2. MAIN STAGE: 4 SPASIOUS PLAYER PODIUMS (1 BARIS PENUH)          */}
       {/* ================================================================= */}
-      <main className="my-auto py-2 flex-1 flex flex-col justify-center">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 w-full">
+      <main className="my-auto py-1 sm:py-2 flex-1 flex flex-col justify-center min-h-0 overflow-hidden">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2.5 lg:gap-3.5 w-full h-full items-stretch">
           {[0, 1, 2, 3].map((slotIdx) => {
             const player = gameState.players[slotIdx];
 
@@ -552,7 +552,7 @@ export default function WaitingRoomLobby({
                 <div
                   key={player.id}
                   className={[
-                    "relative flex flex-col justify-between modern-glass-panel rounded-2xl p-2.5 sm:p-3 transition-all duration-300 shadow-2xl overflow-hidden border min-h-[220px] sm:min-h-[270px] lg:min-h-[320px]",
+                    "relative flex flex-col justify-between modern-glass-panel rounded-xl sm:rounded-2xl p-1.5 sm:p-2 lg:p-3 transition-all duration-300 shadow-2xl overflow-hidden border min-h-[160px] sm:min-h-[220px] lg:min-h-[300px]",
                     isMe
                       ? "ring-2 ring-amber-400/90 shadow-[0_0_30px_rgba(245,158,11,0.3)] border-amber-400/50"
                       : player.isReady
@@ -565,9 +565,9 @@ export default function WaitingRoomLobby({
                 >
                   {/* Bubble Taunt */}
                   {taunt && (
-                    <div className="absolute top-2 inset-x-3 z-30 animate-taunt-pop">
-                      <div className="bg-slate-950/95 border border-amber-400 rounded-xl px-2.5 py-1 text-center shadow-lg">
-                        <span className="text-[11px] font-black text-amber-200 truncate block">
+                    <div className="absolute top-2 inset-x-2 z-30 animate-taunt-pop">
+                      <div className="bg-slate-950/95 border border-amber-400 rounded-xl px-2 py-0.5 text-center shadow-lg">
+                        <span className="text-[10px] sm:text-[11px] font-black text-amber-200 truncate block">
                           {taunt.text}
                         </span>
                       </div>
@@ -575,26 +575,26 @@ export default function WaitingRoomLobby({
                   )}
 
                   {/* Header Slot: Nomor, Kamu Badge, Crown, Mic, Kick */}
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <div className="flex items-center gap-1.5 font-black text-slate-300">
+                  <div className="flex items-center justify-between text-xs mb-0.5 sm:mb-1">
+                    <div className="flex items-center gap-1 sm:gap-1.5 font-black text-slate-300 text-[10px] sm:text-xs">
                       <span className="text-white/60">#{slotIdx + 1}</span>
                       {isMe && (
-                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/50 font-black">
+                        <span className="text-[8px] sm:text-[9px] px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/50 font-black">
                           Kamu
                         </span>
                       )}
                       {isSlotHost && (
-                        <span title="Host Meja" className="text-amber-400 inline-flex items-center gap-0.5">
-                          <Crown className="w-3.5 h-3.5 fill-amber-400" />
+                        <span title="Host Meja" className="text-amber-400 inline-flex items-center">
+                          <Crown className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-amber-400" />
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       {/* Status Mic */}
                       <div
                         className={[
-                          "p-1 rounded-lg",
+                          "p-0.5 sm:p-1 rounded-md sm:rounded-lg",
                           isMicActive
                             ? isSpeaking
                               ? "bg-emerald-500 text-slate-950 animate-pulse"
@@ -604,9 +604,9 @@ export default function WaitingRoomLobby({
                         title={isMicActive ? "Mic Aktif" : "Mic Muted"}
                       >
                         {isMicActive ? (
-                          <Mic className="w-3 h-3" />
+                          <Mic className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                         ) : (
-                          <MicOff className="w-3 h-3 text-rose-400" />
+                          <MicOff className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-400" />
                         )}
                       </div>
 
@@ -616,16 +616,16 @@ export default function WaitingRoomLobby({
                           type="button"
                           onClick={() => onRemovePlayer(player.id)}
                           title="Keluarkan dari Room"
-                          className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                          className="p-0.5 sm:p-1 rounded-md sm:rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         </button>
                       )}
                     </div>
                   </div>
 
                   {/* 3D Model Hero Stage dengan Pedestal Halus */}
-                  <div className="relative w-full flex-1 min-h-[120px] sm:min-h-[150px] lg:min-h-[180px] flex items-center justify-center my-1 rounded-xl bg-gradient-to-b from-white/[0.03] to-black/60 overflow-hidden border border-white/5">
+                  <div className="relative w-full flex-1 min-h-[75px] sm:min-h-[120px] lg:min-h-[170px] flex items-center justify-center my-0.5 sm:my-1 rounded-xl bg-gradient-to-b from-white/[0.03] to-black/60 overflow-hidden border border-white/5">
                     <div className="hero-glow-pedestal bottom-1" />
 
                     <Model3DAvatar
@@ -638,13 +638,13 @@ export default function WaitingRoomLobby({
                       fallback={
                         <div
                           className={[
-                            "w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br flex flex-col items-center justify-center border-2 shadow-xl",
+                            "w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl bg-gradient-to-br flex flex-col items-center justify-center border-2 shadow-xl",
                             charProfile.gradient,
                             charProfile.borderGlow,
                           ].join(" ")}
                         >
-                          <span className="text-2xl sm:text-3xl drop-shadow">{charProfile.icon}</span>
-                          <span className="text-[10px] font-black text-white uppercase tracking-wider">
+                          <span className="text-xl sm:text-2xl lg:text-3xl drop-shadow">{charProfile.icon}</span>
+                          <span className="text-[9px] sm:text-[10px] font-black text-white uppercase tracking-wider">
                             {charProfile.heroName}
                           </span>
                         </div>
@@ -658,31 +658,31 @@ export default function WaitingRoomLobby({
                           type="button"
                           onClick={() => handleCycleHero("prev")}
                           title="Hero Sebelumnya"
-                          className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 border border-white/20 text-white flex items-center justify-center shadow-lg transition active:scale-90 z-20"
+                          className="absolute left-1 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/60 hover:bg-black/90 border border-white/20 text-white flex items-center justify-center shadow-lg transition active:scale-90 z-20 cursor-pointer"
                         >
-                          <ChevronLeft className="w-4 h-4" />
+                          <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleCycleHero("next")}
                           title="Hero Selanjutnya"
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 border border-white/20 text-white flex items-center justify-center shadow-lg transition active:scale-90 z-20"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/60 hover:bg-black/90 border border-white/20 text-white flex items-center justify-center shadow-lg transition active:scale-90 z-20 cursor-pointer"
                         >
-                          <ChevronRight className="w-4 h-4" />
+                          <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                       </>
                     )}
 
                     {/* Tag Nama Karakter Hero */}
-                    <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/75 border border-white/10 text-[9px] font-bold text-amber-300 flex items-center gap-1 pointer-events-none">
+                    <div className="absolute bottom-1 right-1 px-1 sm:px-1.5 py-0.2 rounded bg-black/75 border border-white/10 text-[8px] sm:text-[9px] font-bold text-amber-300 flex items-center gap-0.5 sm:gap-1 pointer-events-none">
                       <span>{charProfile.icon}</span>
-                      <span>{charProfile.heroName}</span>
+                      <span className="hidden xs:inline sm:inline">{charProfile.heroName}</span>
                     </div>
                   </div>
 
                   {/* Kustomisasi Cepat Karakter untuk Kamu (4 Pill Mini Hero) */}
                   {isMe && (
-                    <div className="grid grid-cols-4 gap-1 my-1">
+                    <div className="grid grid-cols-4 gap-0.5 sm:gap-1 my-0.5 sm:my-1">
                       {CHARACTER_PROFILES.map((char, cIdx) => {
                         const isSelected =
                           (myPlayer.seatIndex % CHARACTER_PROFILES.length) === cIdx;
@@ -694,7 +694,7 @@ export default function WaitingRoomLobby({
                             onClick={() => onSaveProfile(undefined, cIdx)}
                             title={`Pilih ${char.heroName}`}
                             className={[
-                              "py-0.5 rounded-lg border text-center transition flex items-center justify-center text-xs active:scale-95",
+                              "py-0.5 rounded-md sm:rounded-lg border text-center transition flex items-center justify-center text-[10px] sm:text-xs active:scale-95 cursor-pointer",
                               isSelected
                                 ? "bg-amber-400 text-slate-950 border-amber-300 font-black shadow"
                                 : "bg-white/5 hover:bg-white/10 border-white/10 text-slate-400",
@@ -708,9 +708,9 @@ export default function WaitingRoomLobby({
                   )}
 
                   {/* Nama Player & Pengeditan Nama */}
-                  <div className="space-y-1 pt-1 text-center">
+                  <div className="space-y-0.5 sm:space-y-1 pt-0.5 sm:pt-1 text-center">
                     {isMe ? (
-                      <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-xl p-0.5">
+                      <div className="flex items-center gap-0.5 sm:gap-1 bg-black/40 border border-white/10 rounded-lg sm:rounded-xl p-0.5">
                         <input
                           type="text"
                           maxLength={14}
@@ -723,15 +723,15 @@ export default function WaitingRoomLobby({
                             if (e.key === "Enter") onSaveProfile(editingName);
                           }}
                           placeholder="Nama kamu..."
-                          className="flex-1 bg-transparent px-2 py-0.5 text-xs text-amber-200 font-bold focus:outline-none min-w-0"
+                          className="flex-1 bg-transparent px-1 sm:px-2 py-0.5 text-[10px] sm:text-xs text-amber-200 font-bold focus:outline-none min-w-0"
                         />
                         <button
                           type="button"
                           onClick={handleRandomizeName}
                           title="Acak Nama Keren"
-                          className="p-1 rounded-lg hover:bg-white/10 text-amber-300 transition shrink-0"
+                          className="p-0.5 sm:p-1 rounded-md sm:rounded-lg hover:bg-white/10 text-amber-300 transition shrink-0 cursor-pointer"
                         >
-                          <Dices className="w-3.5 h-3.5" />
+                          <Dices className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         </button>
                         {editingName.trim() !== myPlayer.name && (
                           <button
@@ -739,14 +739,14 @@ export default function WaitingRoomLobby({
                             disabled={isSubmitting || !editingName.trim()}
                             onClick={() => onSaveProfile(editingName)}
                             title="Simpan Nama"
-                            className="p-1 rounded-lg bg-emerald-500 text-slate-950 transition shrink-0"
+                            className="p-0.5 sm:p-1 rounded-md sm:rounded-lg bg-emerald-500 text-slate-950 transition shrink-0 cursor-pointer"
                           >
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
                           </button>
                         )}
                       </div>
                     ) : (
-                      <div className="font-extrabold text-xs sm:text-sm text-slate-100 truncate px-1">
+                      <div className="font-extrabold text-[10px] sm:text-xs lg:text-sm text-slate-100 truncate px-0.5">
                         {player.name}
                       </div>
                     )}
@@ -754,16 +754,16 @@ export default function WaitingRoomLobby({
                     {/* Badge Status Kesiapan (Ready / Bot) */}
                     <div>
                       {player.isBot ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black bg-sky-950/80 border border-sky-400/50 text-sky-300">
+                        <span className="inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black bg-sky-950/80 border border-sky-400/50 text-sky-300">
                           Bot ({currentBotDiff})
                         </span>
                       ) : player.isReady ? (
-                        <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[9px] font-black bg-emerald-500 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse">
-                          <Check className="w-3 h-3 stroke-[3]" /> SIAP
+                        <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black bg-emerald-500 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse">
+                          <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[3]" /> SIAP
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-white/5 border border-white/10 text-slate-400">
-                          <Clock className="w-3 h-3 text-amber-400" /> Belum Siap
+                        <span className="inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold bg-white/5 border border-white/10 text-slate-400">
+                          <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400" /> Belum Siap
                         </span>
                       )}
                     </div>
@@ -776,13 +776,13 @@ export default function WaitingRoomLobby({
             return (
               <div
                 key={`empty-slot-${slotIdx}`}
-                className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.015] text-center min-h-[220px] sm:min-h-[270px] lg:min-h-[320px] transition hover:border-white/20"
+                className="flex flex-col items-center justify-center p-1.5 sm:p-2.5 lg:p-3 rounded-xl sm:rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.015] text-center min-h-[160px] sm:min-h-[220px] lg:min-h-[300px] transition hover:border-white/20"
               >
-                <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 mb-2">
-                  <Users className="w-6 h-6 text-slate-400" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 mb-1 sm:mb-2">
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-slate-400" />
                 </div>
 
-                <span className="text-xs font-bold text-slate-400 mb-1">
+                <span className="text-[10px] sm:text-xs font-bold text-slate-400 mb-0.5 sm:mb-1">
                   Slot #{slotIdx + 1} Kosong
                 </span>
 
@@ -791,14 +791,14 @@ export default function WaitingRoomLobby({
                     type="button"
                     onClick={onAddBot}
                     disabled={isSubmitting}
-                    className="mt-2 flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-amber-400/20 border border-amber-400/40 hover:border-amber-400/80 text-amber-300 hover:text-amber-200 text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer"
+                    className="mt-1 sm:mt-2 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-white/[0.04] hover:bg-amber-400/20 border border-amber-400/40 hover:border-amber-400/80 text-amber-300 hover:text-amber-200 text-[9px] sm:text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer"
                   >
-                    <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <UserPlus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
                     <span>+ Tambah Bot</span>
                   </button>
                 ) : (
-                  <span className="text-[10px] text-slate-500 italic mt-0.5">
-                    Menunggu teman bergabung...
+                  <span className="text-[8px] sm:text-[10px] text-slate-500 italic mt-0.5">
+                    Menunggu teman...
                   </span>
                 )}
               </div>
@@ -810,17 +810,17 @@ export default function WaitingRoomLobby({
       {/* ================================================================= */}
       {/* 3. BOTTOM ACTION DOCK: CHAT, MIC, STATUS READY & MULAI GAME        */}
       {/* ================================================================= */}
-      <footer className="relative z-20 modern-glass-panel rounded-2xl px-3 sm:px-4 py-2 border border-white/10 shadow-2xl flex flex-wrap items-center justify-between gap-2 shrink-0">
+      <footer className="relative z-20 modern-glass-panel rounded-xl sm:rounded-2xl px-2 sm:px-4 py-1.5 sm:py-2 border border-white/10 shadow-2xl flex items-center justify-between gap-1.5 sm:gap-2 shrink-0">
         {/* Sisi Kiri: Komunikasi (Chat, Mic, Headset) */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Tombol Chat */}
           <button
             type="button"
             onClick={onOpenChat}
             title="Buka Chat Meja"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/10 shadow text-slate-200 hover:text-white font-bold text-xs transition active:scale-95 cursor-pointer"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/10 shadow text-slate-200 hover:text-white font-bold text-xs transition active:scale-95 cursor-pointer"
           >
-            <MessageSquareMore className="w-4 h-4 text-purple-400" />
+            <MessageSquareMore className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400" />
             <span>Chat</span>
           </button>
 
@@ -831,7 +831,7 @@ export default function WaitingRoomLobby({
             disabled={voice.isConnectingMic}
             title={voice.micEnabled ? "Matikan Mikrofon" : "Nyalakan Mikrofon"}
             className={[
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-bold text-xs transition shadow active:scale-95 cursor-pointer",
+              "flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border font-bold text-xs transition shadow active:scale-95 cursor-pointer",
               voice.micEnabled
                 ? voice.peerSpeaking[myPlayer?.id || ""]
                   ? "bg-emerald-500/25 border-emerald-400 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.5)]"
@@ -840,13 +840,13 @@ export default function WaitingRoomLobby({
             ].join(" ")}
           >
             {voice.isConnectingMic ? (
-              <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-amber-300" />
             ) : voice.micEnabled ? (
-              <Mic className="w-4 h-4 text-emerald-300" />
+              <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-300" />
             ) : (
-              <MicOff className="w-4 h-4 text-rose-400" />
+              <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />
             )}
-            <span>{voice.micEnabled ? "Mic On" : "Mic Off"}</span>
+            <span className="hidden xs:inline sm:inline">{voice.micEnabled ? "Mic On" : "Mic Off"}</span>
           </button>
 
           {/* Tombol Speaker Suara Teman */}
@@ -855,16 +855,16 @@ export default function WaitingRoomLobby({
             onClick={voice.toggleSpeaker}
             title={voice.speakerEnabled ? "Bisukan Suara Teman" : "Nyalakan Suara Teman"}
             className={[
-              "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border font-bold text-xs transition shadow active:scale-95 cursor-pointer",
+              "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border font-bold text-xs transition shadow active:scale-95 cursor-pointer",
               voice.speakerEnabled
                 ? "bg-white/[0.05] hover:bg-white/10 border-white/10 text-slate-200"
                 : "bg-rose-950/60 border-rose-500/40 text-rose-300",
             ].join(" ")}
           >
             {voice.speakerEnabled ? (
-              <Headphones className="w-4 h-4" />
+              <Headphones className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             ) : (
-              <VolumeX className="w-4 h-4" />
+              <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             )}
             <span className="hidden sm:inline">
               {voice.speakerEnabled ? "Audio On" : "Audio Mute"}
@@ -890,7 +890,7 @@ export default function WaitingRoomLobby({
         </div>
 
         {/* Sisi Kanan: Tombol SIAP & MULAI GAME */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
           {/* Tombol Ready */}
           {myPlayer && (
             <button
@@ -898,7 +898,7 @@ export default function WaitingRoomLobby({
               disabled={isSubmitting}
               onClick={onToggleReady}
               className={[
-                "flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black shadow-lg transition active:scale-95 cursor-pointer",
+                "flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black shadow-lg transition active:scale-95 cursor-pointer",
                 myPlayer.isReady
                   ? "bg-white/5 hover:bg-white/10 text-amber-300 border border-amber-400/50"
                   : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.35)]",
@@ -906,12 +906,12 @@ export default function WaitingRoomLobby({
             >
               {myPlayer.isReady ? (
                 <>
-                  <Clock className="w-4 h-4" />
+                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>Batal Siap</span>
                 </>
               ) : (
                 <>
-                  <Check className="w-4 h-4 stroke-[3]" />
+                  <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
                   <span>SAYA SIAP!</span>
                 </>
               )}
@@ -924,9 +924,9 @@ export default function WaitingRoomLobby({
               type="button"
               onClick={onStartGame}
               disabled={!canStart || isSubmitting}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 disabled:opacity-35 text-slate-950 font-black text-xs shadow-[0_0_20px_rgba(245,158,11,0.35)] transition active:scale-95 disabled:pointer-events-none cursor-pointer"
+              className="flex items-center gap-1 sm:gap-1.5 px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 disabled:opacity-35 text-slate-950 font-black text-[11px] sm:text-xs shadow-[0_0_20px_rgba(245,158,11,0.35)] transition active:scale-95 disabled:pointer-events-none cursor-pointer"
             >
-              <Play className="w-4 h-4 fill-current" />
+              <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" />
               <span>MULAI GAME</span>
             </button>
           )}

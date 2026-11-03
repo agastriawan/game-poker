@@ -430,7 +430,7 @@ export default function HomePage() {
   const activeProfile = CHARACTER_PROFILES[avatarIdx];
 
   return (
-    <div className="relative h-dvh max-h-dvh w-full overflow-y-auto lg:overflow-hidden flex flex-col justify-between casino-hall-bg text-white px-2.5 sm:px-6 py-2 select-none safe-top-inset">
+    <div className="relative h-dvh max-h-dvh w-full overflow-hidden flex flex-col justify-between casino-hall-bg text-white px-2 sm:px-4 lg:px-6 py-1.5 sm:py-2 select-none safe-top-inset">
       {/* Ambient Radial Spotlight (Warna dinamis menyesuaikan hero aktif) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
@@ -443,7 +443,7 @@ export default function HomePage() {
       {/* ================================================================= */}
       {/* 1. TOP HEADER: FLOATING MODERN GLASS NAVBAR (SERAGAM DENGAN LOBBY) */}
       {/* ================================================================= */}
-      <header className="relative z-30 w-full max-w-7xl mx-auto flex items-center justify-between px-3 py-2 rounded-2xl modern-glass-panel shadow-2xl border border-white/10 shrink-0">
+      <header className="relative z-30 w-full max-w-7xl mx-auto flex items-center justify-between px-2.5 sm:px-3 py-1 sm:py-1.5 lg:py-2 rounded-xl sm:rounded-2xl modern-glass-panel shadow-2xl border border-white/10 shrink-0">
         <div className="flex items-center gap-2 sm:gap-3">
           <img
             src="/logo.png"
@@ -591,24 +591,24 @@ export default function HomePage() {
       </header>
 
       {/* ================================================================= */}
-      {/* 2. MAIN HUB: DUA KOLOM BERGAYA GAME STUDIO (DESKTOP & HP)          */}
+      {/* 2. MAIN HUB: DUA KOLOM BERGAYA GAME STUDIO (DESKTOP & HP LANDSCAPE) */}
       {/* ================================================================= */}
-      <main className="relative z-20 w-full max-w-7xl mx-auto flex-1 min-h-0 flex items-center justify-center p-1 sm:p-3">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 items-center">
-          {/* KOLOM KIRI: HERO 3D SHOWCASE (TAMPIL DI SEMUA LAYAR) */}
-          <div className="lg:col-span-5 flex flex-col items-center justify-center text-center relative py-1">
+      <main className="relative z-20 w-full max-w-7xl mx-auto flex-1 min-h-0 flex items-center justify-center p-0.5 sm:p-2 lg:p-3 overflow-hidden">
+        <div className="w-full grid grid-cols-1 landscape:grid-cols-12 md:grid-cols-12 gap-2 sm:gap-4 lg:gap-6 items-center">
+          {/* KOLOM KIRI: HERO 3D SHOWCASE (KIRI DI DESKTOP & LANDSCAPE) */}
+          <div className="landscape:col-span-5 md:col-span-5 flex flex-col items-center justify-center text-center relative py-0.5 sm:py-1">
             {/* 3D Model Stage */}
             <div className="relative flex flex-col items-center">
               {/* Balon Kutipan Hero yang Elegan */}
-              <div className="mb-1 sm:mb-2 px-3 py-1 rounded-xl bg-white/[0.04] border border-white/10 text-[11px] sm:text-xs text-amber-200 font-semibold italic max-w-xs truncate shadow-lg">
+              <div className="mb-0.5 sm:mb-1.5 px-2.5 py-0.5 sm:py-1 rounded-xl bg-white/[0.04] border border-white/10 text-[10px] sm:text-xs text-amber-200 font-semibold italic max-w-xs truncate shadow-lg">
                 &ldquo;{activeProfile.quote}&rdquo;
               </div>
 
               {/* 3D Model Canvas Container */}
-              <div className="relative w-36 h-40 sm:w-52 sm:h-60 lg:w-68 lg:h-76 flex items-center justify-center">
+              <div className="relative w-28 h-32 xs:w-32 xs:h-36 sm:w-48 sm:h-52 lg:w-64 lg:h-68 flex items-center justify-center">
                 {/* Glowing Pedestal di Bawah Kaki */}
                 <div
-                  className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-28 sm:w-44 h-8 sm:h-10 hero-glow-pedestal blur-md transition-colors duration-700"
+                  className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-24 sm:w-40 h-6 sm:h-8 hero-glow-pedestal blur-md transition-colors duration-700"
                   style={{
                     background: `radial-gradient(ellipse at center, ${HERO_THEMES[avatarIdx].glow} 0%, rgba(0,0,0,0.6) 65%, transparent 80%)`,
                   }}
@@ -620,7 +620,7 @@ export default function HomePage() {
                   autoRotate={true}
                   className="w-full h-full"
                   fallback={
-                    <div className="w-20 h-20 rounded-2xl bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-black text-sm shadow-xl">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-900 border-2 border-amber-400 flex items-center justify-center text-amber-300 font-black text-xs sm:text-sm shadow-xl">
                       {activeProfile.heroName}
                     </div>
                   }
@@ -628,13 +628,13 @@ export default function HomePage() {
               </div>
 
               {/* Info Nama Hero & Role */}
-              <div className="mt-1 space-y-0.5">
+              <div className="mt-0.5 sm:mt-1 space-y-0.5">
                 <div className="flex items-center justify-center gap-1.5">
-                  <span className="text-sm sm:text-lg font-black tracking-wide text-white">
+                  <span className="text-xs sm:text-base font-black tracking-wide text-white">
                     {activeProfile.heroName.toUpperCase()}
                   </span>
                   <span
-                    className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${HERO_THEMES[avatarIdx].tag}`}
+                    className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded-md border ${HERO_THEMES[avatarIdx].tag}`}
                   >
                     {activeProfile.role}
                   </span>
@@ -642,7 +642,7 @@ export default function HomePage() {
               </div>
 
               {/* Hero Switcher Bar (4 Pilihan Avatar) */}
-              <div className="flex items-center justify-center gap-1.5 mt-2">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5 mt-1 sm:mt-1.5">
                 <button
                   type="button"
                   onClick={() =>
@@ -651,13 +651,13 @@ export default function HomePage() {
                         CHARACTER_PROFILES.length
                     )
                   }
-                  className="w-7 h-7 rounded-xl modern-glass-pill hover:bg-white/10 text-slate-300 flex items-center justify-center transition cursor-pointer"
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl modern-glass-pill hover:bg-white/10 text-slate-300 flex items-center justify-center transition cursor-pointer"
                   title="Hero Sebelumnya"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 sm:gap-1">
                   {CHARACTER_PROFILES.map((prof, idx) => {
                     const isSelected = avatarIdx === idx;
                     return (
@@ -666,14 +666,14 @@ export default function HomePage() {
                         type="button"
                         onClick={() => handleSelectAvatar(idx)}
                         className={[
-                          "px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer",
+                          "px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition flex items-center gap-1 cursor-pointer",
                           isSelected
                             ? "bg-amber-400 text-slate-950 font-black shadow-lg scale-105"
                             : "modern-glass-pill text-slate-300 hover:text-white",
                         ].join(" ")}
                       >
                         <span>{prof.icon}</span>
-                        <span className="hidden sm:inline text-[10px]">
+                        <span className="hidden sm:inline text-[9px] sm:text-[10px]">
                           {prof.heroName}
                         </span>
                       </button>
@@ -688,7 +688,7 @@ export default function HomePage() {
                       (avatarIdx + 1) % CHARACTER_PROFILES.length
                     )
                   }
-                  className="w-7 h-7 rounded-xl modern-glass-pill hover:bg-white/10 text-slate-300 flex items-center justify-center transition cursor-pointer"
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl modern-glass-pill hover:bg-white/10 text-slate-300 flex items-center justify-center transition cursor-pointer"
                   title="Hero Selanjutnya"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -698,11 +698,11 @@ export default function HomePage() {
           </div>
 
           {/* KOLOM KANAN: GAME LAUNCHER HUB (CARD UTAMA DENGAN TAB VS BOT & MABAR) */}
-          <div className="lg:col-span-7 w-full max-w-xl mx-auto modern-glass-panel rounded-2xl sm:rounded-3xl p-3 sm:p-5 space-y-2.5 sm:space-y-3.5">
+          <div className="landscape:col-span-7 md:col-span-7 w-full max-w-lg lg:max-w-xl mx-auto modern-glass-panel rounded-2xl sm:rounded-3xl p-2.5 sm:p-3.5 lg:p-4 space-y-2 sm:space-y-2.5">
             {/* Player Profile Header Bar */}
-            <div className="p-2 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-base shrink-0">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-sm sm:text-base shrink-0">
                   {activeProfile.icon}
                 </div>
                 <div className="min-w-0">
@@ -765,7 +765,7 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={handleRandomNickname}
-                className="modern-glass-pill px-2.5 py-1 rounded-xl hover:bg-white/10 text-amber-300 flex items-center gap-1 text-[10px] font-bold shrink-0 transition cursor-pointer"
+                className="modern-glass-pill px-2 sm:px-2.5 py-1 rounded-lg sm:rounded-xl hover:bg-white/10 text-amber-300 flex items-center gap-1 text-[10px] font-bold shrink-0 transition cursor-pointer"
                 title="Acak Nama Gaul Tongkrongan"
               >
                 <Dices className="w-3.5 h-3.5" />
@@ -775,7 +775,7 @@ export default function HomePage() {
 
             {/* Error Message if any */}
             {errorMsg && (
-              <div className="p-2 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs font-bold flex items-center justify-between">
+              <div className="p-1.5 sm:p-2 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs font-bold flex items-center justify-between">
                 <span>{errorMsg}</span>
                 <button
                   onClick={() => setErrorMsg(null)}
@@ -787,7 +787,7 @@ export default function HomePage() {
             )}
 
             {/* MODE SWITCHER TABS (MABAR ONLINE DI KIRI / DEFAULT) */}
-            <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-black/40 border border-white/5">
+            <div className="grid grid-cols-2 gap-1 p-0.5 sm:p-1 rounded-xl bg-black/40 border border-white/5">
               <button
                 type="button"
                 onClick={() => {
@@ -795,7 +795,7 @@ export default function HomePage() {
                   setActiveTab("mabar");
                 }}
                 className={[
-                  "py-1.5 sm:py-2 px-3 rounded-xl font-black text-xs sm:text-sm transition flex items-center justify-center gap-1.5 cursor-pointer",
+                  "py-1 sm:py-1.5 px-2.5 sm:px-3 rounded-lg sm:rounded-xl font-black text-xs sm:text-sm transition flex items-center justify-center gap-1.5 cursor-pointer",
                   activeTab === "mabar"
                     ? "bg-amber-400 text-slate-950 shadow-md font-black"
                     : "text-slate-400 hover:text-white",
@@ -812,7 +812,7 @@ export default function HomePage() {
                   setActiveTab("bot");
                 }}
                 className={[
-                  "py-1.5 sm:py-2 px-3 rounded-xl font-black text-xs sm:text-sm transition flex items-center justify-center gap-1.5 cursor-pointer",
+                  "py-1 sm:py-1.5 px-2.5 sm:px-3 rounded-lg sm:rounded-xl font-black text-xs sm:text-sm transition flex items-center justify-center gap-1.5 cursor-pointer",
                   activeTab === "bot"
                     ? "bg-amber-400 text-slate-950 shadow-md font-black"
                     : "text-slate-400 hover:text-white",
