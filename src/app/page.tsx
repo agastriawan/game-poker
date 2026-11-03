@@ -443,7 +443,7 @@ export default function HomePage() {
       {/* ================================================================= */}
       {/* 1. TOP HEADER: FLOATING MODERN GLASS NAVBAR (SERAGAM DENGAN LOBBY) */}
       {/* ================================================================= */}
-      <header className="relative z-30 w-full max-w-7xl mx-auto flex items-center justify-between px-2.5 sm:px-3 py-1 sm:py-1.5 lg:py-2 rounded-xl sm:rounded-2xl modern-glass-panel shadow-2xl border border-white/10 shrink-0">
+      <header className="relative z-30 w-full max-w-7xl mx-auto flex items-center justify-between px-2.5 sm:px-3 py-1 sm:py-1.5 lg:py-2 rounded-xl sm:rounded-2xl modern-glass-panel shadow-2xl border border-white/10 shrink-0 mb-2 sm:mb-3 lg:mb-4">
         <div className="flex items-center gap-2 sm:gap-3">
           <img
             src="/logo.png"
@@ -593,7 +593,7 @@ export default function HomePage() {
       {/* ================================================================= */}
       {/* 2. MAIN HUB: DUA KOLOM BERGAYA GAME STUDIO (DESKTOP & HP LANDSCAPE) */}
       {/* ================================================================= */}
-      <main className="relative z-20 w-full max-w-7xl mx-auto flex-1 min-h-0 flex items-center justify-center p-0.5 sm:p-2 lg:p-3 overflow-hidden">
+      <main className="relative z-20 w-full max-w-7xl mx-auto flex-1 min-h-0 flex items-center justify-center px-1 sm:px-2 lg:px-3 py-1 sm:py-2 overflow-hidden">
         <div className="w-full grid grid-cols-1 landscape:grid-cols-12 md:grid-cols-12 gap-2 sm:gap-4 lg:gap-6 items-center">
           {/* KOLOM KIRI: HERO 3D SHOWCASE (KIRI DI DESKTOP & LANDSCAPE) */}
           <div className="landscape:col-span-5 md:col-span-5 flex flex-col items-center justify-center text-center relative py-0.5 sm:py-1">
