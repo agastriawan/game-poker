@@ -137,11 +137,11 @@ export function evaluateCombo(selectedCards: Card[]): PlayedCombo | null {
               const orderedCards = [...sorted3, ...pairCards];
 
               return {
-                type: "full_house",
+                type: "straight_flush_pair",
                 cards: orderedCards,
                 primaryValue: sorted3[2].value, // Kartu tertinggi dalam seri 3 kartu tersebut
                 length: 5,
-                label: `Full House Seri ${rankSeq}${suitSym} (Buntut ${pairRankLabel})`,
+                label: `Seri ${rankSeq}${suitSym} (Buntut ${pairRankLabel})`,
               };
             }
           }
@@ -450,7 +450,7 @@ export function findAllValidPlays(
     }
   }
 
-  // 5. Semua Full House (3 Kembar + 2 Buntut, ATAU 3 Seri Sejenis + 2 Buntut)
+  // 5. Semua Full House Klasik (3 Kembar + 2 Buntut)
   if (!currentTable || currentTable.type === "full_house") {
     const triplets: Card[][] = [];
     const pairs: Card[][] = [];
@@ -464,15 +464,24 @@ export function findAllValidPlays(
       }
     }
 
-    // Bentuk A: Triplet + Pair
     for (const t of triplets) {
       for (const p of pairs) {
         if (t[0].value === p[0].value) continue;
         pushIfLegal(evaluateCombo([...t, ...p]));
       }
     }
+  }
 
-    // Bentuk B: 3 Seri Sejenis + Pair
+  // 6. Semua Seri Sejenis + 2 Buntut (3 Seri Sejenis + 2 Buntut)
+  // Catatan: Kategori ini terpisah dari Full House (Triple). Seri hanya bisa dilawan Seri.
+  if (!currentTable || currentTable.type === "straight_flush_pair") {
+    const pairs: Card[][] = [];
+    for (const [, group] of byValue.entries()) {
+      if (group.length >= 2) {
+        pairs.push(group.slice(0, 2));
+      }
+    }
+
     const bySuit = new Map<string, Card[]>();
     for (const c of sorted) {
       if (c.value === 15) continue;

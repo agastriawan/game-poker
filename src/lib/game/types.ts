@@ -34,6 +34,7 @@ export type ComboType =
   | "triple" // 3 kartu angka sama
   | "straight_flush" // Seri sejenis >= 3 kartu (misal 3-4-5 sekop, 3-4-5-6-7 hati)
   | "full_house" // 3 kartu kembar + 2 kartu kembar buntut (misal 4-4-4-3-3)
+  | "straight_flush_pair" // 3 seri sejenis + 2 kartu kembar buntut (misal 4♠-5♠-6♠ + 3-3)
   | "four_of_a_kind"; // 4 kartu kembar lengkap keempat lambang (Bom)
 
 export interface PlayedCombo {

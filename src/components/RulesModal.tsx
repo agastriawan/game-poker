@@ -79,11 +79,10 @@ export default function RulesModal({
                 <strong>Seri Sejenis (Minimal 3 Kartu):</strong> Urutan angka berurutan dengan <strong>lambang yang sama</strong> (misal <code className="text-emerald-300">3♠ 4♠ 5♠</code>). Bisa dilawan dengan jumlah kartu seri yang sama dan angka lebih tinggi meskipun beda lambang (misal dilawan <code className="text-rose-300">4♥ 5♥ 6♥</code>).
               </li>
               <li>
-                <strong>Full House (5 Kartu):</strong> Terdiri dari 3 kartu kepala + 2 kartu kembar buntut. Bisa berupa:
-                <ul className="list-disc list-inside ml-4 mt-0.5 space-y-0.5 text-slate-300">
-                  <li><strong>Full House Klasik:</strong> 3 kartu kembar + 2 buntut (misal <code className="text-amber-300">4-4-4 + 3-3</code>).</li>
-                  <li><strong>Full House Seri Sejenis:</strong> 3 kartu seri sejenis + 2 buntut (misal <code className="text-amber-300">9♦ 10♦ J♦ + 5♥ 5♠</code>). Nilai penentunya adalah kartu tertinggi serinya (J).</li>
-                </ul>
+                <strong>Full House (Triple + Buntut - 5 Kartu):</strong> 3 kartu kembar + 2 kartu kembar buntut (misal <code className="text-amber-300">4-4-4 + 3-3</code>). <strong>Hanya bisa dilawan dengan sesama Full House (Triple)</strong> yang angka triple-nya lebih tinggi.
+              </li>
+              <li>
+                <strong>Seri Sejenis + Buntut (5 Kartu):</strong> 3 kartu seri sejenis + 2 kartu kembar buntut (misal <code className="text-amber-300">4♠ 5♠ 6♠ + 3♥ 3♦</code>). <strong>Hanya bisa dilawan dengan sesama Seri Sejenis + Buntut</strong> yang angka serinya lebih tinggi. Kategori ini terpisah dan <em>tidak bisa saling melawan</em> dengan Full House (Triple).
               </li>
               <li>
                 <strong>Aturan Habis Kartu & Jalan Bebas:</strong> Jika pemain A menghabiskan seluruh kartunya dan seluruh pemain tidak ada yang membantai kartu terakhir tersebut (semua lawan lewat / Pass), maka meja dikosongkan dan <strong>pemain setelah A bebas mengeluarkan kartu/kombinasi apa saja</strong>.

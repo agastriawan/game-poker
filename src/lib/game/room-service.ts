@@ -1,4 +1,19 @@
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import {
+  addPlayerToGame,
+  createInitialGameState,
+  forfeitPlayer,
+  passTurn,
+  playCards,
+  removePlayerFromGame,
+  sendTaunt,
+  startNewRound,
+  submitPlayerThrees,
+  timeoutTurn,
+  togglePlayerReady,
+  updatePlayerProfile,
+  updateRoomSettings,
+} from "./engine";
 import { GameState } from "./types";
 
 const LOCAL_ROOM_PREFIX = "poker_tongkrongan_room_";
@@ -111,51 +126,228 @@ export async function fetchRoomState(roomCode: string): Promise<GameState | null
   return null;
 }
 
+export type GameActionType =
+  | "create_room"
+  | "create_bot_game"
+  | "join_room"
+  | "remove_player"
+  | "start_round"
+  | "submit_threes"
+  | "play_cards"
+  | "pass_turn"
+  | "timeout_turn"
+  | "send_taunt"
+  | "forfeit_game"
+  | "update_room_settings"
+  | "toggle_ready"
+  | "update_player_profile";
+
+/**
+ * Eksekusi langkah permainan langsung di memori lokal menggunakan pure engine.
+ * Menjadi fail-safe / fallback mutlak jika koneksi internet terputus atau timeout,
+ * menjamin permainan (khususnya lawan Bot) TIDAK PERNAH STUCK!
+ */
+export function executeLocalEngineAction(
+  action: GameActionType,
+  state?: GameState,
+  payload?: Record<string, unknown>
+): GameState {
+  switch (action) {
+    case "create_room":
+      return createInitialGameState({
+        roomCode: String(payload?.roomCode || "POKR01"),
+        hostId: String(payload?.hostId || "host-1"),
+        hostName: String(payload?.hostName || "Pemain 1"),
+      });
+
+    case "create_bot_game": {
+      const roomCode = String(payload?.roomCode || "POKR01");
+      const hostId = String(payload?.hostId || "host-1");
+      const hostName = String(payload?.hostName || "Pemain 1");
+      const totalPlayers = Math.min(
+        4,
+        Math.max(2, Number(payload?.totalPlayers || 4))
+      );
+      const turnDurationLimit =
+        payload?.turnDurationLimit !== undefined
+          ? Number(payload.turnDurationLimit)
+          : 20;
+      const botDifficulty =
+        payload?.botDifficulty === "easy" ||
+        payload?.botDifficulty === "hard" ||
+        payload?.botDifficulty === "medium"
+          ? payload.botDifficulty
+          : "medium";
+
+      let tempState = createInitialGameState({ roomCode, hostId, hostName });
+      tempState = {
+        ...tempState,
+        players: tempState.players.map((p) =>
+          p.id === hostId ? { ...p, isReady: true } : p
+        ),
+      };
+      tempState = updateRoomSettings(tempState, {
+        turnDurationLimit,
+        botDifficulty,
+      });
+
+      const botNames = ["Bot Himiya", "Bot Riko", "Bot Sari"];
+      for (let i = 0; i < totalPlayers - 1; i++) {
+        tempState = addPlayerToGame(tempState, {
+          id: `bot-${i + 1}-${Date.now()}-${i}`,
+          name: botNames[i],
+          isBot: true,
+        });
+      }
+      return startNewRound(tempState);
+    }
+
+    case "join_room":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return addPlayerToGame(state, {
+        id: String(payload?.playerId),
+        name: String(payload?.playerName),
+        isBot: Boolean(payload?.isBot),
+      });
+
+    case "remove_player":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return removePlayerFromGame(state, String(payload?.playerId || payload?.targetPlayerId));
+
+    case "update_room_settings":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return updateRoomSettings(state, {
+        turnDurationLimit:
+          payload?.turnDurationLimit !== undefined
+            ? Number(payload.turnDurationLimit)
+            : undefined,
+        botDifficulty:
+          payload?.botDifficulty === "easy" ||
+          payload?.botDifficulty === "hard" ||
+          payload?.botDifficulty === "medium"
+            ? payload.botDifficulty
+            : undefined,
+      });
+
+    case "toggle_ready":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return togglePlayerReady(state, String(payload?.playerId));
+
+    case "update_player_profile":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return updatePlayerProfile(state, String(payload?.playerId), {
+        name: payload?.name ? String(payload.name) : undefined,
+        seatIndex:
+          payload?.seatIndex !== undefined ? Number(payload.seatIndex) : undefined,
+      });
+
+    case "start_round": {
+      if (!state) throw new Error("State room tidak ditemukan.");
+      const requesterId = payload?.playerId ? String(payload.playerId) : undefined;
+      return startNewRound(state, requesterId);
+    }
+
+    case "submit_threes":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return submitPlayerThrees(state, String(payload?.playerId));
+
+    case "play_cards":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return playCards(
+        state,
+        String(payload?.playerId),
+        (payload?.cardIds as string[]) || []
+      );
+
+    case "pass_turn":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return passTurn(state, String(payload?.playerId));
+
+    case "timeout_turn":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return timeoutTurn(state, String(payload?.playerId));
+
+    case "send_taunt":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return sendTaunt(
+        state,
+        String(payload?.playerId),
+        String(payload?.tauntId || "custom"),
+        payload?.customText ? String(payload.customText) : undefined,
+        payload?.customEmoji ? String(payload.customEmoji) : undefined
+      );
+
+    case "forfeit_game":
+      if (!state) throw new Error("State room tidak ditemukan.");
+      return forfeitPlayer(state, String(payload?.playerId));
+
+    default:
+      if (!state) throw new Error("Aksi tidak dikenal.");
+      return state;
+  }
+}
+
 /**
  * Memanggil Server API (/api/game) untuk menjalankan aksi dan CSPRNG shuffle di sisi server,
  * lalu menyimpan hasilnya ke Supabase + Broadcast.
+ * Dilengkapi fallback otomatis ke engine lokal jika koneksi terputus/offline,
+ * sehingga permainan (terutama lawan Bot) tidak pernah macet (stuck).
  */
 export async function dispatchGameAction(
-  action:
-    | "create_room"
-    | "create_bot_game"
-    | "join_room"
-    | "remove_player"
-    | "start_round"
-    | "submit_threes"
-    | "play_cards"
-    | "pass_turn"
-    | "timeout_turn"
-    | "send_taunt"
-    | "forfeit_game"
-    | "update_room_settings"
-    | "toggle_ready"
-    | "update_player_profile",
+  action: GameActionType,
   currentState?: GameState,
   payload?: Record<string, unknown>
 ): Promise<GameState> {
-  const res = await fetch("/api/game", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action,
-      state: currentState,
-      payload,
-    }),
-  });
-
-  const data = await res.json();
-  if (!res.ok || data.error) {
-    throw new Error(data.error || "Gagal memproses langkah permainan.");
-  }
-
-  const nextState = data.state as GameState;
   const isPureBotGame =
     action === "create_bot_game" ||
-    (nextState.players.length > 1 &&
-      nextState.players.filter((p) => !p.isBot).length <= 1 &&
+    (currentState &&
+      currentState.players.length > 1 &&
+      currentState.players.filter((p) => !p.isBot).length <= 1 &&
       action !== "create_room" &&
       action !== "join_room");
+
+  let nextState: GameState;
+
+  // Jika game lawan bot murni dan browser terdeteksi offline, langsung eksekusi lokal tanpa menunggu fetch network
+  if (isPureBotGame && typeof navigator !== "undefined" && !navigator.onLine) {
+    nextState = executeLocalEngineAction(action, currentState, payload);
+    await persistGameState(nextState, false);
+    return nextState;
+  }
+
+  try {
+    const controller = new AbortController();
+    // Gunakan timeout cepat (2.5 detik untuk bot game, 6 detik untuk mabar online)
+    const timeoutMs = isPureBotGame ? 2500 : 6000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch("/api/game", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        state: currentState,
+        payload,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error || "Gagal memproses langkah permainan.");
+    }
+
+    nextState = data.state as GameState;
+  } catch (err) {
+    // FALLBACK KONEKSI PUTUS / OFFLINE / TIMEOUT:
+    // Menjamin langkah (terutama aksi bot atau timeout) tidak pernah macet!
+    console.warn(
+      `[dispatchGameAction] Jaringan offline/terputus (${action}). Menjalankan engine lokal:`,
+      err
+    );
+    nextState = executeLocalEngineAction(action, currentState, payload);
+  }
 
   // Untuk game lawan Bot murni, jangan blokir UI menunggu jaringan Supabase
   await persistGameState(nextState, !isPureBotGame);
@@ -227,6 +419,23 @@ export function subscribeToRoom(
       .subscribe();
 
     const pollInterval = setInterval(async () => {
+      // Jika game ini adalah game lawan Bot murni, lewati polling remote
+      // agar tidak menimpa state lokal saat terjadi koneksi putus-nyambung
+      if (typeof window !== "undefined") {
+        const rawLocal = localStorage.getItem(`${LOCAL_ROOM_PREFIX}${code}`);
+        if (rawLocal) {
+          try {
+            const parsed = JSON.parse(rawLocal) as GameState;
+            if (
+              parsed.players &&
+              parsed.players.filter((p) => !p.isBot).length <= 1
+            ) {
+              return;
+            }
+          } catch {}
+        }
+      }
+
       const { data, error } = await supabase
         .from("game_rooms")
         .select("state")

@@ -339,7 +339,8 @@ console.log("=== Menjalankan Unit Test Aturan Game Poker Online ===");
   console.log("✅ [PASS] Aturan Baru: Kartu Poker (2) Tidak Boleh Ditaruh di Paling Akhir");
 }
 
-// 8. Uji Full House Seri Sejenis + 2 Buntut (Contoh: 9♦ 10♦ J♦ + 5♥ 5♠)
+// 8. Uji Pemisahan Kategori: Full House (Triple + Buntut) vs Seri Sejenis + 2 Buntut (4-5-6 + Buntut)
+// Triple hanya bisa dilawan triple, dan seri hanya bisa dilawan seri. Tidak bisa saling mengalahkan!
 {
   const fhSeri910J = evaluateCombo([
     makeCard("5", 5, "hearts"),
@@ -350,7 +351,7 @@ console.log("=== Menjalankan Unit Test Aturan Game Poker Online ===");
   ]);
 
   assert.notEqual(fhSeri910J, null, "9-10-J wajik + 5-5 buntut harus diakui sebagai kombinasi sah");
-  assert.equal(fhSeri910J?.type, "full_house");
+  assert.equal(fhSeri910J?.type, "straight_flush_pair", "Tipe harus straight_flush_pair terpisah dari full_house");
   assert.equal(fhSeri910J?.primaryValue, 11, "Primary value harus nilai kartu tertinggi seri (J = 11)");
 
   // Full House klasik 8 (8-8-8 + 3-3, primaryValue 8)
@@ -362,10 +363,11 @@ console.log("=== Menjalankan Unit Test Aturan Game Poker Online ===");
     makeCard("3", 3, "hearts"),
   ])!;
 
+  // Seri Sejenis + Buntut (9-10-J) TIDAK BISA melawan Full House Triple (8-8-8)
   assert.equal(
     canBeatPlay(fhSeri910J!, fh8).valid,
-    true,
-    "Full House Seri 9-10-J (11) harus bisa mengalahkan Full House 8 (8)"
+    false,
+    "Seri 9-10-J + Buntut TIDAK BOLEH mengalahkan Full House 8-8-8 (Triple vs Seri berbeda kategori)"
   );
 
   // Full House klasik Q (Q-Q-Q + 3-3, primaryValue 12)
@@ -377,13 +379,35 @@ console.log("=== Menjalankan Unit Test Aturan Game Poker Online ===");
     makeCard("3", 3, "hearts"),
   ])!;
 
+  // Full House Triple (Q-Q-Q) TIDAK BISA melawan Seri Sejenis + Buntut (9-10-J)
   assert.equal(
     canBeatPlay(fhQ, fhSeri910J!).valid,
-    true,
-    "Full House Q (12) harus bisa mengalahkan Full House Seri 9-10-J (11)"
+    false,
+    "Full House Q-Q-Q TIDAK BOLEH mengalahkan Seri 9-10-J + Buntut (Triple vs Seri berbeda kategori)"
   );
 
-  console.log("✅ [PASS] Aturan Full House Seri Sejenis + 2 Buntut (9-10-J♦ + 5♥ 5♠)");
+  // Sesama Seri Sejenis + Buntut: Seri 9-10-J (11) HARUS bisa mengalahkan Seri 7-8-9 (9)
+  const fhSeri789 = evaluateCombo([
+    makeCard("4", 4, "hearts"),
+    makeCard("4", 4, "spades"),
+    makeCard("7", 7, "diamonds"),
+    makeCard("8", 8, "diamonds"),
+    makeCard("9", 9, "diamonds"),
+  ])!;
+  assert.equal(
+    canBeatPlay(fhSeri910J!, fhSeri789).valid,
+    true,
+    "Sesama Seri + Buntut: Seri 9-10-J (11) harus bisa mengalahkan Seri 7-8-9 (9)"
+  );
+
+  // Sesama Full House Triple: Full House Q-Q-Q (12) HARUS bisa mengalahkan Full House 8-8-8 (8)
+  assert.equal(
+    canBeatPlay(fhQ, fh8).valid,
+    true,
+    "Sesama Full House Triple: Q-Q-Q (12) harus bisa mengalahkan 8-8-8 (8)"
+  );
+
+  console.log("✅ [PASS] Aturan Pemisahan Kategori: Triple vs Triple, Seri vs Seri (Tidak Saling Melawan)");
 }
 
 // 9. Uji Pemain A Habis Kartu, Seluruh Lawan Pass -> Pemain Setelah A Bebas Mengeluarkan Kartu Apapun

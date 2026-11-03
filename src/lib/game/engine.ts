@@ -850,7 +850,11 @@ export function playCards(
         text: "Gampang banget (EZ)!",
         timestamp: Date.now(),
       };
-    } else if (combo.type === "full_house" || combo.type === "straight_flush") {
+    } else if (
+      combo.type === "full_house" ||
+      combo.type === "straight_flush" ||
+      combo.type === "straight_flush_pair"
+    ) {
       autoBotTaunt = {
         id: `taunt-combo-${Date.now()}`,
         senderId: player.id,

@@ -49,7 +49,7 @@ import {
   evaluateCombo,
   findAllBombsInHand,
 } from "@/lib/game/rules";
-import { dispatchGameAction } from "@/lib/game/room-service";
+import { dispatchGameAction, executeLocalEngineAction } from "@/lib/game/room-service";
 import { useVoiceChat } from "@/lib/game/useVoiceChat";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { BotDifficulty, GameState, PlayedCombo, PlayerState, TauntEvent } from "@/lib/game/types";
@@ -129,6 +129,8 @@ function getComboDisplayLabel(combo: PlayedCombo | null): string {
       return `Seri (${combo.length})`;
     case "full_house":
       return "Full House";
+    case "straight_flush_pair":
+      return "Seri + Buntut";
     case "four_of_a_kind":
       return "BOM";
     default:
@@ -577,12 +579,68 @@ export default function GameTable({
           onStateChange(next);
         }
       } catch (err) {
-        console.error("Bot step error:", err);
+        console.error("Bot step error, executing local emergency fallback:", err);
+        try {
+          const fallbackAction =
+            botAction.actionType === "submit_threes"
+              ? "submit_threes"
+              : botAction.actionType === "pass"
+              ? "pass_turn"
+              : "play_cards";
+          const payload =
+            botAction.actionType === "submit_threes" || botAction.actionType === "pass"
+              ? { playerId: botAction.botId }
+              : { playerId: botAction.botId, cardIds: botAction.cardIds };
+          if (botAction.actionType === "pass") {
+            soundEngine.playPassSound();
+          }
+          const recovered = executeLocalEngineAction(fallbackAction, gameState, payload);
+          onStateChange(recovered);
+        } catch (recoverErr) {
+          console.error("Fatal bot recover error:", recoverErr);
+        }
       }
-    }, 900);
+    }, 800);
 
     return () => clearTimeout(timer);
   }, [gameState, onStateChange]);
+
+  // Watchdog Anti-Stuck: Menjamin bot selalu jalan dan tidak macet meskipun koneksi putus / background tab
+  useEffect(() => {
+    if (gameState.phase !== "playing" && gameState.phase !== "collecting_threes") return;
+
+    const watchdog = setInterval(() => {
+      const current = gameStateRef.current;
+      if (current.phase !== "playing" && current.phase !== "collecting_threes") return;
+
+      const pendingBotAction = getNextBotAction(current);
+      if (!pendingBotAction) return;
+
+      console.warn("[Watchdog] Bot action pending for >2.6s, recovering bot step locally...");
+      try {
+        const fallbackAction =
+          pendingBotAction.actionType === "submit_threes"
+            ? "submit_threes"
+            : pendingBotAction.actionType === "pass"
+            ? "pass_turn"
+            : "play_cards";
+        const payload =
+          pendingBotAction.actionType === "submit_threes" || pendingBotAction.actionType === "pass"
+            ? { playerId: pendingBotAction.botId }
+            : { playerId: pendingBotAction.botId, cardIds: pendingBotAction.cardIds };
+
+        if (pendingBotAction.actionType === "pass") {
+          soundEngine.playPassSound();
+        }
+        const recovered = executeLocalEngineAction(fallbackAction, current, payload);
+        onStateChange(recovered);
+      } catch (e) {
+        console.error("[Watchdog] Bot recovery failed:", e);
+      }
+    }, 2600);
+
+    return () => clearInterval(watchdog);
+  }, [onStateChange, gameState.phase]);
 
   // Evaluasi kartu yang sedang dipilih pemain
   const selectedCardsObj = useMemo(() => {
