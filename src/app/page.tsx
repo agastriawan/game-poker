@@ -443,7 +443,7 @@ export default function HomePage() {
       {/* ================================================================= */}
       {/* 1. TOP HEADER: FLOATING MODERN GLASS NAVBAR (SERAGAM DENGAN LOBBY) */}
       {/* ================================================================= */}
-      <header className="relative z-30 w-full max-w-7xl mx-auto flex items-center justify-between px-2.5 sm:px-3 py-1 sm:py-1.5 lg:py-2 rounded-xl sm:rounded-2xl modern-glass-panel shadow-2xl border border-white/10 shrink-0 mb-2 sm:mb-3 lg:mb-4">
+      <header className="relative z-30 w-full max-w-7xl mx-auto flex items-center justify-between px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl modern-glass-panel shadow-2xl border border-white/10 shrink-0 mb-1 sm:mb-2 lg:mb-2.5">
         <div className="flex items-center gap-2 sm:gap-3">
           <img
             src="/logo.png"
@@ -593,7 +593,7 @@ export default function HomePage() {
       {/* ================================================================= */}
       {/* 2. MAIN HUB: DUA KOLOM BERGAYA GAME STUDIO (DESKTOP & HP LANDSCAPE) */}
       {/* ================================================================= */}
-      <main className="relative z-20 w-full max-w-7xl mx-auto flex-1 min-h-0 flex items-center justify-center px-1 sm:px-2 lg:px-3 py-1 sm:py-2 overflow-hidden">
+      <main className="relative z-20 w-full max-w-7xl mx-auto flex-1 min-h-0 flex items-center justify-center px-1 sm:px-2 lg:px-3 py-0.5 sm:py-1 overflow-hidden">
         <div className="w-full grid grid-cols-1 landscape:grid-cols-12 md:grid-cols-12 gap-2 sm:gap-4 lg:gap-6 items-center">
           {/* KOLOM KIRI: HERO 3D SHOWCASE (KIRI DI DESKTOP & LANDSCAPE) */}
           <div className="landscape:col-span-5 md:col-span-5 flex flex-col items-center justify-center text-center relative py-0.5 sm:py-1">
@@ -698,7 +698,7 @@ export default function HomePage() {
           </div>
 
           {/* KOLOM KANAN: GAME LAUNCHER HUB (CARD UTAMA DENGAN TAB VS BOT & MABAR) */}
-          <div className="landscape:col-span-7 md:col-span-7 w-full max-w-lg lg:max-w-xl mx-auto modern-glass-panel rounded-2xl sm:rounded-3xl p-2.5 sm:p-3.5 lg:p-4 space-y-2 sm:space-y-2.5">
+          <div className="landscape:col-span-7 md:col-span-7 w-full max-w-md lg:max-w-lg mx-auto modern-glass-panel rounded-2xl sm:rounded-3xl p-2 sm:p-3 lg:p-3.5 space-y-1.5 sm:space-y-2">
             {/* Player Profile Header Bar */}
             <div className="p-1.5 sm:p-2 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
@@ -825,9 +825,9 @@ export default function HomePage() {
 
             {/* TAB CONTENT 1: MAIN LAWAN BOT */}
             {activeTab === "bot" && (
-              <div className="space-y-2.5 sm:space-y-3 animate-fade-in">
+              <div className="space-y-1.5 sm:space-y-2 animate-fade-in">
                 {/* 1. Pilih Formasi Pemain */}
-                <div className="space-y-1">
+                <div className="space-y-0.5 sm:space-y-1">
                   <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-slate-300">
                     <span className="flex items-center gap-1">
                       <Users className="w-3 h-3 text-amber-400" /> Formasi Pemain:
@@ -841,7 +841,7 @@ export default function HomePage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
                     {[
                       { count: 4, label: "4 Pemain" },
                       { count: 3, label: "3 Pemain" },
@@ -857,7 +857,7 @@ export default function HomePage() {
                             setSelectedBotPlayerCount(count as 2 | 3 | 4);
                           }}
                           className={[
-                            "py-1.5 rounded-xl text-center text-xs font-bold border transition cursor-pointer",
+                            "py-1 rounded-lg sm:rounded-xl text-center text-xs font-bold border transition cursor-pointer",
                             isSelected
                               ? "bg-amber-400/25 border-amber-400 text-amber-200 font-black ring-1 ring-amber-400"
                               : "bg-white/[0.02] border-white/5 hover:border-white/20 text-slate-400",
@@ -871,7 +871,7 @@ export default function HomePage() {
                 </div>
 
                 {/* 2. Tingkat Kesulitan Bot */}
-                <div className="space-y-1">
+                <div className="space-y-0.5 sm:space-y-1">
                   <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-slate-300">
                     <span className="flex items-center gap-1">
                       <Swords className="w-3 h-3 text-amber-400" /> Level Bot:
@@ -885,7 +885,7 @@ export default function HomePage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
                     {[
                       { id: "easy", label: "Santai" },
                       { id: "medium", label: "Menengah" },
@@ -901,7 +901,7 @@ export default function HomePage() {
                             setBotDifficulty(lvl.id as BotDifficulty);
                           }}
                           className={[
-                            "py-1.5 rounded-xl text-center text-xs font-bold border transition cursor-pointer",
+                            "py-1 rounded-lg sm:rounded-xl text-center text-xs font-bold border transition cursor-pointer",
                             isSelected
                               ? "bg-amber-400/25 border-amber-400 text-amber-200 font-black ring-1 ring-amber-400"
                               : "bg-white/[0.02] border-white/5 hover:border-white/20 text-slate-400",
@@ -915,7 +915,7 @@ export default function HomePage() {
                 </div>
 
                 {/* 3. Waktu Giliran */}
-                <div className="space-y-1">
+                <div className="space-y-0.5 sm:space-y-1">
                   <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-slate-300">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3 text-amber-400" /> Waktu Giliran:
@@ -942,7 +942,7 @@ export default function HomePage() {
                             setBotTurnLimit(dur);
                           }}
                           className={[
-                            "py-1.5 rounded-xl text-center text-xs font-bold border transition cursor-pointer",
+                            "py-1 rounded-lg sm:rounded-xl text-center text-xs font-bold border transition cursor-pointer",
                             isSelected
                               ? "bg-amber-400/25 border-amber-400 text-amber-200 font-black ring-1 ring-amber-400"
                               : "bg-white/[0.02] border-white/5 hover:border-white/20 text-slate-400",
@@ -966,7 +966,7 @@ export default function HomePage() {
                     )
                   }
                   disabled={loading}
-                  className="w-full py-2.5 sm:py-3 px-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-emerald-500 via-green-500 to-teal-600 hover:from-emerald-400 hover:to-green-400 text-white font-black text-xs sm:text-sm tracking-wider shadow-[0_4px_25px_rgba(16,185,129,0.45)] transition transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer mt-1 animate-cta-green-pulse"
+                  className="w-full py-2 sm:py-2.5 px-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-emerald-500 via-green-500 to-teal-600 hover:from-emerald-400 hover:to-green-400 text-white font-black text-xs sm:text-sm tracking-wider shadow-[0_4px_25px_rgba(16,185,129,0.45)] transition transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer mt-0.5 animate-cta-green-pulse"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -982,22 +982,22 @@ export default function HomePage() {
 
             {/* TAB CONTENT 2: MABAR ONLINE */}
             {activeTab === "mabar" && (
-              <div className="space-y-2.5 sm:space-y-3 animate-fade-in">
+              <div className="space-y-1.5 sm:space-y-2 animate-fade-in">
                 {/* 1. Buat Room Mabar Baru */}
-                <div className="p-2.5 sm:p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
                       <PlusCircle className="w-3.5 h-3.5 text-amber-400" /> Buat Meja Baru (Host)
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                  <p className="text-[9px] sm:text-[10px] text-slate-400 leading-tight">
                     Dapatkan kode 6-digit untuk dibagikan ke teman, atau tambah bot di dalam meja.
                   </p>
                   <button
                     type="button"
                     onClick={handleCreateRoom}
                     disabled={loading}
-                    className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-green-500 to-teal-600 hover:from-emerald-400 hover:to-green-400 text-white font-black text-xs shadow-[0_4px_20px_rgba(16,185,129,0.4)] transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer animate-cta-green-pulse"
+                    className="w-full py-1.5 sm:py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-green-500 to-teal-600 hover:from-emerald-400 hover:to-green-400 text-white font-black text-xs shadow-[0_4px_20px_rgba(16,185,129,0.4)] transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer animate-cta-green-pulse"
                   >
                     {loading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1009,8 +1009,8 @@ export default function HomePage() {
                 </div>
 
                 {/* 2. Gabung Meja Teman */}
-                <div className="p-2.5 sm:p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
-                  <div className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                  <div className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
                     <LogIn className="w-3.5 h-3.5 text-amber-400" /> Masuk Meja Teman
                   </div>
                   <form onSubmit={handleJoinRoom} className="flex gap-1.5">
@@ -1022,13 +1022,13 @@ export default function HomePage() {
                         setJoinCodeInput(e.target.value.toUpperCase())
                       }
                       placeholder="KODE ROOM (Cth: AB3X9K)"
-                      className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none font-mono font-black text-center text-xs tracking-widest text-amber-300 uppercase"
+                      className="flex-1 px-2.5 py-1 sm:py-1.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 focus:outline-none font-mono font-black text-center text-xs tracking-widest text-amber-300 uppercase"
                     />
                     <button
                       type="submit"
                       disabled={loading || !joinCodeInput.trim()}
                       title="Gabung Meja"
-                      className="w-10 h-9 sm:w-11 sm:h-9 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 disabled:opacity-40 text-slate-950 font-black flex items-center justify-center transition shrink-0 shadow-lg cursor-pointer"
+                      className="w-9 h-8 sm:w-10 sm:h-9 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 disabled:opacity-40 text-slate-950 font-black flex items-center justify-center transition shrink-0 shadow-lg cursor-pointer"
                     >
                       {loading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
